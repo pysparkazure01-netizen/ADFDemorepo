@@ -1,0 +1,18 @@
+{
+	"name": "ds_copy_contry_file",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_onprem_git",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Binary",
+		"typeProperties": {
+			"location": {
+				"type": "FileServerLocation",
+				"fileName": "countries06-12-2020-10-20-50.csv",
+				"folderPath": "countries"
+			}
+		}
+	}
+}
