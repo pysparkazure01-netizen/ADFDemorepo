@@ -1,0 +1,9 @@
+{
+	"name": "ADF-Transformation-1001",
+	"location": "eastus",
+	"identity": {
+		"type": "SystemAssigned",
+		"principalId": "785d977f-8c18-4bce-a41f-90a825e6ac82",
+		"tenantId": "bde03140-0c53-4a51-b0fb-d2d9926285b9"
+	}
+}
