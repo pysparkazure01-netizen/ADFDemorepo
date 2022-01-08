@@ -1,0 +1,17 @@
+{
+	"name": "ls_onprem_git",
+	"type": "Microsoft.DataFactory/factories/linkedservices",
+	"properties": {
+		"annotations": [],
+		"type": "FileServer",
+		"typeProperties": {
+			"host": "C:\\saurabh\\Azure\\source_folder\\SH",
+			"userId": "LAPTOP-O6HEMKDH\\saxen",
+			"encryptedCredential": "eyJDcmVkZW50aWFsSWQiOiIwOWQxYjc4NS04NmE0LTRkOTctODAwMi1mMjIxNjMzOTk4ZmQiLCJWZXJzaW9uIjoiMi4wIiwiQ2xhc3NUeXBlIjoiTWljcm9zb2Z0LkRhdGFQcm94eS5Db3JlLkludGVyU2VydmljZURhdGFDb250cmFjdC5DcmVkZW50aWFsU1UwNkNZMTQifQ=="
+		},
+		"connectVia": {
+			"referenceName": "IRSharedonprem",
+			"type": "IntegrationRuntimeReference"
+		}
+	}
+}
