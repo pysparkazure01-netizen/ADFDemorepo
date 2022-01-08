@@ -1,0 +1,6 @@
+{
+	"name": "IRonprem",
+	"properties": {
+		"type": "SelfHosted"
+	}
+}
