@@ -1,0 +1,27 @@
+{
+	"$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+	"contentVersion": "1.0.0.0",
+	"parameters": {
+		"factoryName": {
+			"value": "ADF-Transformation-1001"
+		},
+		"ls_azureadlsgen2_accountKey": {
+			"value": ""
+		},
+		"ls_onprem_git_password": {
+			"value": ""
+		},
+		"ls_azureadlsgen2_properties_typeProperties_url": {
+			"value": "https://shellazureadlsgen2.dfs.core.windows.net"
+		},
+		"ls_onprem_git_properties_typeProperties_host": {
+			"value": "C:\\saurabh\\Azure\\source_folder\\SH"
+		},
+		"ls_onprem_git_properties_typeProperties_userId": {
+			"value": "LAPTOP-O6HEMKDH\\saxen"
+		},
+		"IRSharedonprem_properties_typeProperties_linkedInfo_resourceId": {
+			"value": "/subscriptions/03da433b-270e-47ca-9171-ace662579f75/resourcegroups/rg-Shell-1001/providers/Microsoft.DataFactory/factories/ADF-Tutotrials-1001/integrationruntimes/IR-selfHostedAsus"
+		}
+	}
+}
