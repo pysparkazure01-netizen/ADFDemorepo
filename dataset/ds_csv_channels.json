@@ -1,0 +1,49 @@
+{
+	"name": "ds_csv_channels",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_gen2_channels",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "DelimitedText",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": "channels06-12-2020-10-20-50.csv",
+				"folderPath": "input",
+				"fileSystem": "sales"
+			},
+			"columnDelimiter": ",",
+			"escapeChar": "\\",
+			"firstRowAsHeader": true,
+			"quoteChar": "\""
+		},
+		"schema": [
+			{
+				"name": "CHANNEL_ID",
+				"type": "String"
+			},
+			{
+				"name": "CHANNEL_DESC",
+				"type": "String"
+			},
+			{
+				"name": "CHANNEL_CLASS",
+				"type": "String"
+			},
+			{
+				"name": "CHANNEL_CLASS_ID",
+				"type": "String"
+			},
+			{
+				"name": "CHANNEL_TOTAL",
+				"type": "String"
+			},
+			{
+				"name": "CHANNEL_TOTAL_ID",
+				"type": "String"
+			}
+		]
+	}
+}

@@ -1,0 +1,21 @@
+{
+	"name": "ds_parquet_channels",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_gen2_channels",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "Parquet",
+		"typeProperties": {
+			"location": {
+				"type": "AzureBlobFSLocation",
+				"fileName": "channel.parquet",
+				"folderPath": "output",
+				"fileSystem": "sales"
+			},
+			"compressionCodec": "snappy"
+		},
+		"schema": []
+	}
+}
