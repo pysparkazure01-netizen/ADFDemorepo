@@ -1,0 +1,214 @@
+CREATE OR REPLACE PROCEDURE UAT_ADS.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_UPDATE(SALESFORCE_UPDATE_FROM_APP VARCHAR)
+RETURNS string
+LANGUAGE PYTHON
+RUNTIME_VERSION = 3.9
+HANDLER = 'main'
+EXTERNAL_ACCESS_INTEGRATIONS = (SALESFORCE_API_EXTERNAL_ACCESS_INTEGRATION)
+PACKAGES = ('pyjwt', 'cryptography', 'requests', 'simplejson', 'snowflake-snowpark-python', 'pandas')
+SECRETS = ('cred' = PROD_DB_MANAGER.SECRETS.SALESFORCE_API_INTEGRATION_SECRET)
+EXECUTE AS OWNER
+AS
+$$
+import _snowflake
+import simplejson as json
+import requests
+import snowflake.snowpark as snowpark
+import pandas as pd
+import time
+from io import StringIO
+
+BULK_API_VERSION = "v60.0"  # Salesforce API version
+
+def create_bulk_job(auth_token, subscriptionID, instance_url):
+    url = f"{instance_url}/services/data/{BULK_API_VERSION}/jobs/ingest"
+    headers = {
+        'Authorization': f'Bearer {auth_token}',
+        'Content-Type': 'application/json',
+        'Ocp-Apim-Subscription-Key': subscriptionID
+    }
+    payload = {
+        "object": "Contact",
+        "operation": "update",
+        "contentType": "CSV",
+        "lineEnding": "LF"
+    }
+    resp = requests.post(url, headers=headers, json=payload)
+    resp.raise_for_status()
+    return resp.json()["id"]
+
+def upload_batch(auth_token, subscriptionID, instance_url, job_id, csv_data):
+    url = f"{instance_url}/services/data/{BULK_API_VERSION}/jobs/ingest/{job_id}/batches"
+    headers = {
+        'Authorization': f'Bearer {auth_token}',
+        'Content-Type': 'text/csv',
+        'Ocp-Apim-Subscription-Key': subscriptionID
+    }
+    resp = requests.put(url, headers=headers, data=csv_data)
+    resp.raise_for_status()
+    return resp.status_code
+
+def close_job(auth_token, subscriptionID, instance_url, job_id):
+    url = f"{instance_url}/services/data/{BULK_API_VERSION}/jobs/ingest/{job_id}"
+    headers = {
+        'Authorization': f'Bearer {auth_token}',
+        'Content-Type': 'application/json',
+        'Ocp-Apim-Subscription-Key': subscriptionID
+    }
+    payload = {"state": "UploadComplete"}
+    resp = requests.patch(url, headers=headers, json=payload)
+    resp.raise_for_status()
+    return resp.json()["state"]
+
+def wait_for_completion(auth_token, subscriptionID, instance_url, job_id):
+    url = f"{instance_url}/services/data/{BULK_API_VERSION}/jobs/ingest/{job_id}"
+    headers = {
+        'Authorization': f'Bearer {auth_token}',
+        'Ocp-Apim-Subscription-Key': subscriptionID
+    }
+    while True:
+        resp = requests.get(url, headers=headers)
+        resp.raise_for_status()
+        state = resp.json()["state"]
+        if state in ("JobComplete", "Failed", "Aborted"):
+            return state
+        time.sleep(5)  # wait before checking again
+
+def download_results(auth_token, subscriptionID, instance_url, job_id, result_type):
+    url = f"{instance_url}/services/data/{BULK_API_VERSION}/jobs/ingest/{job_id}/{result_type}Results"
+    headers = {
+        'Authorization': f'Bearer {auth_token}',
+        'Ocp-Apim-Subscription-Key': subscriptionID
+    }
+    resp = requests.get(url, headers=headers)
+    resp.raise_for_status()
+    return resp.text  # CSV format
+
+def salesforce_contact_update_process(session: snowpark.Session, app_db, app_schema, load_nbr):
+    # Get credentials
+    credentials = json.loads(_snowflake.get_generic_secret_string('cred'), strict=False)
+    subscriptionID = credentials.get("subscriptionID")
+    instance_url = credentials.get("instance_url")  # e.g. https://mydomain.my.salesforce.com
+
+    # Previous run delta
+    prev_run_delta_query = f"""
+        SELECT NVL(MAX(delta_end_date), '1990-01-01') AS previous_run_delta_end_date 
+        FROM {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_CONTROL 
+        WHERE load_status = 1
+    """
+    previous_run_delta_end_date = session.sql(prev_run_delta_query).collect()[0]["PREVIOUS_RUN_DELTA_END_DATE"]
+
+    # Auth token
+    auth_proc = "CALL UAT_ADS.DWNSTRM_SALESFORCE.SALESFORCE_AUTH_TOKEN_GEN('SALESFORCE_AUTH_TOKEN')"
+    auth_token = session.sql(auth_proc).collect()[0]["SALESFORCE_AUTH_TOKEN_GEN"]
+
+    # Insert control entry
+    cntrl_table_query = f"""
+        INSERT INTO {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_CONTROL 
+        SELECT {load_nbr}, '{previous_run_delta_end_date}', NULL, CURRENT_TIMESTAMP, NULL, 0, CURRENT_TIMESTAMP, 'SFADMIN'
+    """
+    session.sql(cntrl_table_query).collect()
+
+    # Fetch all contacts for update
+    contact_df = session.sql(f"""
+        SELECT CONTACTID as Id, MKT_EMAIL, MKT_TITLE, MKT_SEGMENTATION_A, MKT_PREDICTION_A, MKT_PRIMARY_CONTACT
+        FROM {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE
+        WHERE row_cre_dt > '{previous_run_delta_end_date}'
+    """).to_pandas()
+
+    if contact_df.empty:
+        return "No contacts to update."
+
+    # Convert DataFrame to CSV for Bulk API
+    csv_buffer = StringIO()
+    contact_df.to_csv(csv_buffer, index=False)
+    csv_data = csv_buffer.getvalue()
+
+    # Bulk API process
+    job_id = create_bulk_job(auth_token, subscriptionID, instance_url)
+    upload_batch(auth_token, subscriptionID, instance_url, job_id, csv_data)
+    close_job(auth_token, subscriptionID, instance_url, job_id)
+    final_state = wait_for_completion(auth_token, subscriptionID, instance_url, job_id)
+
+    # Fetch per-record results
+    if final_state == "JobComplete":
+        success_csv = download_results(auth_token, subscriptionID, instance_url, job_id, "successful")
+        failed_csv = download_results(auth_token, subscriptionID, instance_url, job_id, "failed")
+
+        # Parse and log successes
+        if success_csv.strip():
+            success_df = pd.read_csv(StringIO(success_csv))
+            for _, row in success_df.iterrows():
+                contact_id = row.get("sf__Id", "")
+                log_query = f"""
+                    INSERT INTO {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_LOG
+                    VALUES ('{contact_id}', '', 'Success', '', CURRENT_TIMESTAMP, 'SFADMIN')
+                """
+                session.sql(log_query).collect()
+
+        # Parse and log failures
+        if failed_csv.strip():
+            failed_df = pd.read_csv(StringIO(failed_csv))
+            for _, row in failed_df.iterrows():
+                contact_id = row.get("sf__Id", "")
+                error_msg = row.get("sf__Error", "")
+                log_query = f"""
+                    INSERT INTO {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_LOG
+                    VALUES ('{contact_id}', '', 'Failed', '{error_msg.replace("'", "''")}', CURRENT_TIMESTAMP, 'SFADMIN')
+                """
+                session.sql(log_query).collect()
+    else:
+        # Log if job failed completely
+        log_query = f"""
+            INSERT INTO {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_LOG
+            VALUES (NULL, '', '{final_state}', '', CURRENT_TIMESTAMP, 'SFADMIN')
+        """
+        session.sql(log_query).collect()
+
+def main(session: snowpark.Session, SALESFORCE_UPDATE_FROM_APP):
+    # Get DB/schema
+    app_db_schema_query = f"""
+        SELECT SALESFORCE_UPDATE_FROM_APP_DB, SALESFORCE_UPDATE_FROM_APP_SCHEMA 
+        FROM UAT_ADS.DWNSTRM_SALESFORCE.SALESFORCE_UPDATE_PROCESS_CNTRL 
+        WHERE SALESFORCE_UPDATE_OBJECT = 'CONTACT' 
+        AND SALESFORCE_UPDATE_FROM_APP='{SALESFORCE_UPDATE_FROM_APP}'
+    """
+    app_db_return = session.sql(app_db_schema_query).collect()
+    app_db = [row["SALESFORCE_UPDATE_FROM_APP_DB"] for row in app_db_return][0]
+    app_schema = [row["SALESFORCE_UPDATE_FROM_APP_SCHEMA"] for row in app_db_return][0]
+
+    # Load status check
+    load_status_query = f"""
+        SELECT NVL(MIN(LOAD_STATUS),1) AS LOAD_STATUS 
+        FROM {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_CONTROL
+    """
+    load_status = session.sql(load_status_query).collect()[0]["LOAD_STATUS"]
+
+    if load_status == 0:
+        return "Previous load is in progress"
+
+    # Load number
+    load_nbr_query = f"""
+        SELECT {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE_LOAD_NBR.nextval AS LOAD_NBR
+    """
+    load_nbr = session.sql(load_nbr_query).collect()[0]["LOAD_NBR"]
+
+    # Delta end date
+    delta_end_date_query = f"""
+        SELECT MAX(ROW_CRE_DT) AS delta_end_date 
+        FROM {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE
+    """
+    delta_end_date = session.sql(delta_end_date_query).collect()[0]["DELTA_END_DATE"]
+
+    # Run async Bulk API process
+    salesforce_contact_update_process(session, app_db, app_schema, load_nbr)
+
+    # Update control table
+    cntrl_table_update_query = f"""
+        UPDATE {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_CONTROL
+        SET LOAD_STATUS=1, DELTA_END_DATE='{delta_end_date}', LOAD_END_DATE=GETDATE()
+        WHERE LOAD_NBR={load_nbr}
+    """
+    session.sql(cntrl_table_update_query).collect()
+
+    return "Salesforce Contact Bulk API Update Completed with Per-Record Logging"
+$$;
