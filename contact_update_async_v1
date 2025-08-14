@@ -1,0 +1,126 @@
+import json
+import time
+import requests
+import pandas as pd
+from io import StringIO
+
+def main(session):
+
+    # ========== 1. AUTHENTICATION ==========
+    auth_proc = """
+    CALL PROD_ADS.DWNSTRM_SALESFORCE.SALESFORCE_AUTH_TOKEN_GEN('SALESFORCE_AUTH_TOKEN')
+    """
+    auth_response_raw = session.sql(auth_proc).collect()[0]["SALESFORCE_AUTH_TOKEN_GEN"]
+
+    try:
+        auth_response = json.loads(auth_response_raw)
+    except Exception as e:
+        raise ValueError(f"Could not parse auth response JSON: {auth_response_raw}") from e
+
+    auth_token = auth_response.get("access_token")
+    instance_url = auth_response.get("instance_url")
+
+    if not auth_token:
+        raise ValueError("Salesforce authentication failed: missing access_token")
+    if not instance_url or not instance_url.startswith("https://"):
+        raise ValueError(f"Salesforce authentication failed: invalid instance_url '{instance_url}'")
+
+    headers = {
+        "Authorization": f"Bearer {auth_token}",
+        "Content-Type": "application/json"
+    }
+
+    # ========== 2. GET CONTACT DATA FROM SNOWFLAKE ==========
+    contact_query = """
+    SELECT 
+        ContactId,
+        MKT_EMAIL,
+        MKT_TITLE,
+        MKT_SEGMENTATION_A,
+        MKT_PREDICTION_A,
+        MKT_PRIMARY_CONTACT
+    FROM APP_DB.APP_SCHEMA.SALESFORCE_CONTACT_DATA_UPDATE
+    """
+    contact_df = session.sql(contact_query).to_pandas()
+
+    if contact_df.empty:
+        print("No contact updates found.")
+        return
+
+    # Convert DataFrame to CSV for Bulk API
+    csv_buffer = StringIO()
+    contact_df.to_csv(csv_buffer, index=False)
+    csv_data = csv_buffer.getvalue()
+
+    # ========== 3. CREATE BULK API JOB ==========
+    create_job_url = f"{instance_url}/services/data/v60.0/jobs/ingest"
+    job_payload = {
+        "object": "Contact",
+        "operation": "update",
+        "contentType": "CSV"
+    }
+    job_response = requests.post(create_job_url, headers=headers, json=job_payload)
+    job_response.raise_for_status()
+    job_id = job_response.json()["id"]
+
+    print(f"Bulk API job created: {job_id}")
+
+    # ========== 4. UPLOAD BATCH ==========
+    upload_url = f"{instance_url}/services/data/v60.0/jobs/ingest/{job_id}/batches"
+    upload_headers = {
+        "Authorization": f"Bearer {auth_token}",
+        "Content-Type": "text/csv"
+    }
+    upload_response = requests.put(upload_url, headers=upload_headers, data=csv_data)
+    upload_response.raise_for_status()
+
+    print(f"Uploaded {len(contact_df)} contacts to job {job_id}")
+
+    # ========== 5. CLOSE JOB ==========
+    close_url = f"{instance_url}/services/data/v60.0/jobs/ingest/{job_id}"
+    close_payload = {"state": "UploadComplete"}
+    close_response = requests.patch(close_url, headers=headers, json=close_payload)
+    close_response.raise_for_status()
+
+    print("Job closed, waiting for completion...")
+
+    # ========== 6. WAIT FOR JOB TO COMPLETE ==========
+    status_url = f"{instance_url}/services/data/v60.0/jobs/ingest/{job_id}"
+    while True:
+        status_response = requests.get(status_url, headers=headers)
+        status_response.raise_for_status()
+        state = status_response.json()["state"]
+        print(f"Job status: {state}")
+        if state in ["JobComplete", "Failed", "Aborted"]:
+            break
+        time.sleep(5)
+
+    # ========== 7. DOWNLOAD RESULTS ==========
+    success_url = f"{instance_url}/services/data/v60.0/jobs/ingest/{job_id}/successfulResults"
+    fail_url = f"{instance_url}/services/data/v60.0/jobs/ingest/{job_id}/failedResults"
+
+    success_csv = requests.get(success_url, headers=headers).text
+    fail_csv = requests.get(fail_url, headers=headers).text
+
+    success_df = pd.read_csv(StringIO(success_csv)) if success_csv.strip() else pd.DataFrame()
+    fail_df = pd.read_csv(StringIO(fail_csv)) if fail_csv.strip() else pd.DataFrame()
+
+    # ========== 8. LOG RESULTS ==========
+    for _, row in success_df.iterrows():
+        log_query = f"""
+        INSERT INTO APP_DB.APP_SCHEMA.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_LOG
+        (CONTACT_ID, RESPONSE_STATUS, RESPONSE_MESSAGE, ROW_CRE_DT)
+        VALUES ('{row['sf__Id']}', 'SUCCESS', '', CURRENT_TIMESTAMP)
+        """
+        session.sql(log_query).collect()
+
+    for _, row in fail_df.iterrows():
+        log_query = f"""
+        INSERT INTO APP_DB.APP_SCHEMA.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_LOG
+        (CONTACT_ID, RESPONSE_STATUS, RESPONSE_MESSAGE, ROW_CRE_DT)
+        VALUES ('{row['sf__Id']}', 'FAILED', '{row['sf__Error']}', CURRENT_TIMESTAMP)
+        """
+        session.sql(log_query).collect()
+
+    print("Audit log updated.")
+
