@@ -19,9 +19,6 @@ import snowflake.snowpark as snowpark
 
 BULK_API_VERSION = "v60.0"
 
-# ==== CONFIG ====
-HARDCODED_INSTANCE_URL = "https://yourorg.my.salesforce.com"  # <-- Change to your Salesforce org's URL
-
 def _escape_sql(s):
     if s is None:
         return ''
@@ -78,16 +75,9 @@ def download_results_csv(instance_url, token, subscription_id, job_id, kind):
     resp.raise_for_status()
     return resp.text
 
-def salesforce_contact_update_process(session: snowpark.Session, app_db, app_schema, load_nbr):
+def salesforce_contact_update_process(session: snowpark.Session, app_db, app_schema, load_nbr, SALESFORCE_UPDATE_FROM_APP):
     creds = json.loads(_snowflake.get_generic_secret_string('cred'), strict=False)
     subscription_id = creds.get("subscriptionID")
-
-    prev_run_sql = f"""
-        SELECT NVL(MAX(delta_end_date), '1990-01-01') AS previous_run_delta_end_date
-        FROM {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_CONTROL
-        WHERE load_status = 1
-    """
-    previous_run_delta_end_date = session.sql(prev_run_sql).collect()[0]["PREVIOUS_RUN_DELTA_END_DATE"]
 
     # === AUTH ===
     auth_proc = "CALL PROD_ADS.DWNSTRM_SALESFORCE.SALESFORCE_AUTH_TOKEN_GEN('SALESFORCE_AUTH_TOKEN')"
@@ -96,9 +86,26 @@ def salesforce_contact_update_process(session: snowpark.Session, app_db, app_sch
     if not token.startswith("ey"):
         raise ValueError(f"Unexpected token format: {token}")
 
-    instance_url = HARDCODED_INSTANCE_URL
+    # === URL ===
+    url_query = f"""
+        SELECT SALESFORCE_INSTANCE_URL
+        FROM {app_db}.{app_schema}.SALESFORCE_UPDATE_PROCESS_CNTRL
+        WHERE SALESFORCE_UPDATE_OBJECT = 'CONTACT'
+          AND SALESFORCE_UPDATE_FROM_APP = '{_escape_sql(SALESFORCE_UPDATE_FROM_APP)}'
+    """
+    url_rows = session.sql(url_query).collect()
+    if not url_rows:
+        raise ValueError("No instance URL found in SALESFORCE_UPDATE_PROCESS_CNTRL for CONTACT")
+    instance_url = url_rows[0]["SALESFORCE_INSTANCE_URL"]
 
-    # === CONTROL ROW START ===
+    # === CONTROL START ===
+    prev_run_sql = f"""
+        SELECT NVL(MAX(delta_end_date), '1990-01-01') AS previous_run_delta_end_date
+        FROM {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_CONTROL
+        WHERE load_status = 1
+    """
+    previous_run_delta_end_date = session.sql(prev_run_sql).collect()[0]["PREVIOUS_RUN_DELTA_END_DATE"]
+
     ctrl_ins = f"""
         INSERT INTO {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_CONTROL
         (load_nbr, delta_start_date, delta_end_date, load_start_date, load_end_date, load_status, row_cre_dt, row_cre_usr_id)
@@ -206,7 +213,7 @@ def main(session: snowpark.Session, SALESFORCE_UPDATE_FROM_APP: str):
     """
     delta_end_date = session.sql(delta_sql).collect()[0]["DELTA_END_DATE"]
 
-    result_msg = salesforce_contact_update_process(session, app_db, app_schema, load_nbr)
+    result_msg = salesforce_contact_update_process(session, app_db, app_schema, load_nbr, SALESFORCE_UPDATE_FROM_APP)
 
     ctrl_upd = f"""
         UPDATE {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_CONTROL
