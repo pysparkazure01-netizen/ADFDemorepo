@@ -1,0 +1,330 @@
+---Proc for AI Generated Description
+CREATE OR REPLACE PROCEDURE prod_db_manager.inventory.inventory_describe_tables_and_columns_under_schema(catalog_name STRING, schema_name STRING, set_table_comment boolean, set_column_comment boolean, VAR_AI_DESC_GEN_LOG_ID STRING, V_BATCH_NUMBER STRING)
+RETURNS STRING
+LANGUAGE JAVASCRIPT
+AS
+$$
+try {
+    var tables_sql = `SELECT distinct concat(a.database_name, '.', a.schema_name, '.', a.table_name) as tableName, a.table_name
+                      FROM prod_db_manager.inventory.table_inventory a inner join prod_db_manager.account_usage.tables b
+		      on a.database_name = b.TABLE_CATALOG and a.schema_name = b.TABLE_SCHEMA and a.table_name = b.table_name and b.DELETED is null
+                      WHERE upper(a.schema_name) = upper('${SCHEMA_NAME}')
+                      AND upper(a.database_name) = upper('${CATALOG_NAME}')` ;
+
+    var stmt = snowflake.createStatement({sqlText: tables_sql});
+    var result = stmt.execute();
+
+    while (result.next()) {
+        var tableName = result.getColumnValue(1);
+        var table_name_short = result.getColumnValue(2);
+
+        // Call the other stored procedure that returns JSON
+        var call_sql = `CALL AI_GENERATE_TABLE_DESC('${tableName}', {'describe_columns': true, 'use_table_data': true})`;
+        var call_stmt = snowflake.createStatement({sqlText: call_sql});
+        var call_result = call_stmt.execute();
+        call_result.next();
+        var jsonData = call_result.getColumnValue(1);
+
+        var table = jsonData.TABLE[0];
+        var columns = jsonData.COLUMNS;
+
+        var table_description = table.description;
+        var table_name = table.name;
+        var database_name = table.database_name;
+        var schema_name = table.schema_name;
+        // Get current timestamp
+        var timestamp_stmt = snowflake.createStatement({sqlText: `SELECT CURRENT_TIMESTAMP()`});
+        var timestamp_result = timestamp_stmt.execute();
+        timestamp_result.next();
+        var current_timestamp = timestamp_result.getColumnValue(1);
+
+        var insert_sql = `INSERT INTO prod_db_manager.inventory.inventory_descriptions_catalog_stage_${V_BATCH_NUMBER} (VAR_AI_DESC_GEN_LOG_ID, domain, description, name, database_name, schema_name, table_name, row_cre_dt, row_cre_usr_id, row_mod_dt, row_mod_usr_id)
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        var insert_stmt = snowflake.createStatement({
+            sqlText: insert_sql,
+            binds: [VAR_AI_DESC_GEN_LOG_ID, 'TABLE', table_description, table_name, database_name,schema_name, table_name, current_timestamp, 'SFAdmin', current_timestamp, 'SFAdmin']
+        });
+
+        insert_stmt.execute();
+
+        if (SET_TABLE_COMMENT) {
+            var set_commment_sql = 'ALTER TABLE ' + database_name + '.' + schema_name + '.' + table_name + ' SET COMMENT = ?';
+            var set_comment_stmt = snowflake.createStatement({
+                sqlText: set_commment_sql,
+                binds: [ table_description ]
+            });
+            set_comment_stmt.execute();
+        }
+
+
+        // Loop through each columns in the JSON
+        for (var i = 0; i < columns.length; i++) {
+            var column_description = columns[i].description;
+            var column_name = columns[i].name;
+            // Get current timestamp
+	    var timestamp_stmt = snowflake.createStatement({sqlText: `SELECT CURRENT_TIMESTAMP()`});
+            var timestamp_result = timestamp_stmt.execute();
+            timestamp_result.next();
+            var current_timestamp = timestamp_result.getColumnValue(1);
+
+            var insert_sql = `INSERT INTO prod_db_manager.inventory.inventory_descriptions_catalog_stage_${V_BATCH_NUMBER} (VAR_AI_DESC_GEN_LOG_ID, domain, description, name, database_name, schema_name, table_name, row_cre_dt, row_cre_usr_id, row_mod_dt, row_mod_usr_id)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+
+            var insert_stmt = snowflake.createStatement({
+                sqlText: insert_sql,
+                binds: [VAR_AI_DESC_GEN_LOG_ID, 'COLUMN', column_description, column_name, database_name, schema_name, table_name, current_timestamp, 'SFAdmin', current_timestamp, 'SFAdmin']
+            });
+
+            insert_stmt.execute();
+
+            if (SET_COLUMN_COMMENT) {
+                var set_commment_sql = `ALTER TABLE  ${database_name}.${schema_name}.${table_name} MODIFY COLUMN ${column_name}  COMMENT '${column_description}'` ;
+                var set_comment_stmt = snowflake.createStatement({
+                    sqlText: set_commment_sql
+                });
+                set_comment_stmt.execute();
+            }
+        }
+    }
+
+    return 'Success';
+} catch(err) {
+    return 'Error: ' + err ;
+}
+$$;
+
+
+---Create Wrapper ASYNC Proc 
+CREATE OR REPLACE PROCEDURE prod_db_manager.inventory.AI_GENERATED_TABLE_COLUMN_DESC()
+  RETURNS STRING
+  LANGUAGE SQL
+  EXECUTE AS OWNER
+AS
+DECLARE
+  VAR_AI_DESC_GEN_LOG_ID INT;
+  V_BATCH_NUMBER NUMBER(38,0);  -- Explicit NUMBER type for cursor binding
+
+  CUR_BATCH CURSOR FOR
+(select distinct batch_number from (with schema_list_inner as (select distinct a.database_name, a.schema_name, 1 as ROWNM
+from prod_db_manager.inventory.schema_inventory a inner join prod_db_manager.account_usage.schemata b
+on a.database_name = b.CATALOG_NAME and a.schema_name = b.schema_name and b.DELETED is null order by 1,2)
+select a.database_name, a.schema_name, NTILE(select round(count(ROWNM)/17) from schema_list_inner) OVER (ORDER BY a.database_name, a.schema_name) AS batch_number
+from schema_list_inner a) order by batch_number);
+
+BEGIN
+  -- Initialize log ID
+  SELECT prod_db_manager.inventory.AI_DESC_GEN_LOG_ID.nextval INTO VAR_AI_DESC_GEN_LOG_ID;
+
+  -- Outer loop over batch numbers
+OPEN CUR_BATCH;
+  FOR batch_rec IN CUR_BATCH DO
+    SET V_BATCH_NUMBER := batch_rec.batch_number;
+
+      -- Asynchronous call to for batch to run for tables and columns descriptions
+      ASYNC(CALL prod_db_manager.inventory.AI_GENERATED_TABLE_COLUMN_DESC_STAGE(
+          :V_BATCH_NUMBER, :VAR_AI_DESC_GEN_LOG_ID
+        ));
+    END FOR;
+    AWAIT ALL;
+
+  RETURN 'Success';
+END;
+
+---Create Wrapper ASYNC Proc 
+CREATE OR REPLACE PROCEDURE prod_db_manager.inventory.AI_GENERATED_TABLE_COLUMN_DESC_STAGE(V_BATCH_NUMBER NUMBER, VAR_AI_DESC_GEN_LOG_ID NUMBER)
+  RETURNS STRING
+  LANGUAGE SQL
+  EXECUTE AS OWNER
+AS
+DECLARE
+  V_DBNAME VARCHAR(255);       -- Explicit VARCHAR length for database_name
+  V_SCHEMANAME VARCHAR(255);   -- Explicit VARCHAR length for schema_name
+  V_STAGE_TABLENAME VARCHAR(255);
+  V_SQL VARCHAR;
+
+  CUR_SCHEMA CURSOR FOR
+(select distinct database_name, schema_name, batch_number from (with schema_list_inner as (select distinct a.database_name, a.schema_name, 1 as ROWNM
+from prod_db_manager.inventory.schema_inventory a inner join prod_db_manager.account_usage.schemata b
+on a.database_name = b.CATALOG_NAME and a.schema_name = b.schema_name and b.DELETED is null order by 1,2)
+select a.database_name, a.schema_name, NTILE(select round(count(ROWNM)/17) from schema_list_inner) OVER (ORDER BY a.database_name, a.schema_name) AS batch_number
+from schema_list_inner a) AA WHERE batch_number = (?));
+    
+
+BEGIN
+
+      SET V_STAGE_TABLENAME := concat('prod_db_manager.inventory.inventory_descriptions_catalog_stage_', to_varchar(trunc(V_BATCH_NUMBER)));
+          -- Create staging table (once)
+        SET V_SQL := 'CREATE OR REPLACE TRANSIENT TABLE ' || V_STAGE_TABLENAME || ' AS SELECT * FROM prod_db_manager.inventory.inventory_descriptions_catalog WHERE 1=0';
+        EXECUTE IMMEDIATE V_SQL;
+
+    -- Inner loop over schemas in the current batch
+  OPEN CUR_SCHEMA USING (V_BATCH_NUMBER);
+    FOR schema_rec IN CUR_SCHEMA DO
+      SET V_DBNAME := schema_rec.database_name;
+      SET V_SCHEMANAME := schema_rec.schema_name;
+        
+    -- Asynchronous call to describe tables and columns
+      ASYNC(CALL prod_db_manager.inventory.inventory_describe_tables_and_columns_under_schema(
+          :v_dbname, :v_schemaname, 'N', 'N', :VAR_AI_DESC_GEN_LOG_ID, :V_BATCH_NUMBER
+        ));
+    END FOR;
+	CLOSE CUR_SCHEMA;
+    -- Await all asynchronous operations
+    AWAIT ALL;
+     
+    SET V_SQL := 'INSERT INTO prod_db_manager.inventory.inventory_descriptions_catalog SELECT * FROM ' || V_STAGE_TABLENAME;
+    EXECUTE IMMEDIATE :V_SQL;
+
+    -- Drop the stage table
+    SET V_SQL := 'DROP TABLE ' || V_STAGE_TABLENAME;
+    EXECUTE IMMEDIATE :V_SQL;
+    
+  RETURN 'Success';
+END;
+
+
+-----Call Proc
+call prod_db_manager.inventory.AI_GENERATED_TABLE_COLUMN_DESC();
+
+
+-----Apply
+---Create Wrapper ASYNC Proc 
+CREATE OR REPLACE PROCEDURE prod_db_manager.inventory.APPLY_AI_GENERATED_TABLE_DESC()
+  RETURNS STRING
+  LANGUAGE SQL
+  EXECUTE AS OWNER
+AS
+DECLARE
+  V_BATCH_NUMBER NUMBER(38,0);  -- Explicit NUMBER type for cursor binding
+  V_DBNAME STRING;
+  V_SCHEMANAME STRING;
+  CUR_BATCH CURSOR FOR
+(select distinct a.database_name, a.schema_name
+from prod_db_manager.inventory.table_inventory z inner join prod_db_manager.inventory.schema_inventory a 
+on z.database_name = a.database_name and z.schema_name = a.schema_name inner join prod_db_manager.account_usage_snap.schemata b
+on a.database_name = b.CATALOG_NAME and a.schema_name = b.schema_name and b.DELETED is null 
+where z.content_defenition is not null);
+
+BEGIN
+
+  -- Outer loop over batch numbers
+OPEN CUR_BATCH;
+  FOR batch_rec IN CUR_BATCH DO
+      SET V_DBNAME := batch_rec.database_name;
+      SET V_SCHEMANAME := batch_rec.schema_name;
+
+      -- Asynchronous call to for batch to run for tables and columns descriptions
+      ASYNC(CALL prod_db_manager.inventory.APPLY_AI_GENERATED_TABLE_DESC_STAGE(
+          :v_dbname, :v_schemaname
+        ));
+    END FOR;
+    AWAIT ALL;
+
+  RETURN 'Success';
+END;
+
+---Create Wrapper ASYNC Proc 
+CREATE OR REPLACE PROCEDURE prod_db_manager.inventory.APPLY_AI_GENERATED_TABLE_DESC_STAGE(DATABASE_NAME STRING, SCHEMA_NAME STRING)
+  RETURNS STRING
+  LANGUAGE SQL
+  EXECUTE AS OWNER
+AS
+DECLARE
+  V_DBNAME VARCHAR(255);       -- Explicit VARCHAR length for database_name
+  V_SCHEMANAME VARCHAR(255);   -- Explicit VARCHAR length for schema_name
+  V_SQL VARCHAR;
+
+  CUR_SCHEMA CURSOR FOR
+(select distinct a.database_name, a.schema_name, z.table_name, concat('alter table ', z.database_name, '.', z.schema_name, '.', z.table_name, ' set comment = \'', replace(z.content_defenition, '\'', ''), '\';') Apply_Table_Comment
+from prod_db_manager.inventory.table_inventory z inner join prod_db_manager.inventory.schema_inventory a 
+on z.database_name = a.database_name and z.schema_name = a.schema_name inner join prod_db_manager.account_usage_snap.schemata b
+on a.database_name = b.CATALOG_NAME and a.schema_name = b.schema_name and b.DELETED is null inner join prod_db_manager.account_usage_snap.tables c
+on z.database_name = c.table_catalog and z.schema_name = c.table_schema and z.table_name = c.table_name and c.deleted is null and c.table_type = 'BASE TABLE'
+where z.content_defenition is not null and c.TABLE_OWNER = 'ENTERPRISE_ADMIN_INTERNAL_ONSHORE' and z.database_name = (?) and z.schema_name = (?));
+    
+
+BEGIN
+    -- Inner loop over schemas in the current batch
+  OPEN CUR_SCHEMA USING (DATABASE_NAME, SCHEMA_NAME);
+    FOR schema_rec IN CUR_SCHEMA DO
+      SET V_SQL := schema_rec.Apply_Table_Comment;
+
+    -- Asynchronous call to describe tables and columns
+      ASYNC(EXECUTE IMMEDIATE V_SQL);
+    END FOR;
+    -- Await all asynchronous operations
+    AWAIT ALL;
+   
+  RETURN 'Success';
+END;
+
+
+---Create Wrapper ASYNC Proc 
+CREATE OR REPLACE PROCEDURE prod_db_manager.inventory.APPLY_AI_GENERATED_COLUMN_DESC()
+  RETURNS STRING
+  LANGUAGE SQL
+  EXECUTE AS OWNER
+AS
+DECLARE
+  V_BATCH_NUMBER NUMBER(38,0);  -- Explicit NUMBER type for cursor binding
+  V_DBNAME STRING;
+  V_SCHEMANAME STRING;
+  CUR_BATCH CURSOR FOR
+(select distinct a.database_name, a.schema_name
+from prod_db_manager.inventory.table_inventory z inner join prod_db_manager.inventory.schema_inventory a 
+on z.database_name = a.database_name and z.schema_name = a.schema_name inner join prod_db_manager.account_usage_snap.schemata b
+on a.database_name = b.CATALOG_NAME and a.schema_name = b.schema_name and b.DELETED is null 
+where z.content_defenition is not null);
+
+BEGIN
+
+  -- Outer loop over batch numbers
+OPEN CUR_BATCH;
+  FOR batch_rec IN CUR_BATCH DO
+      SET V_DBNAME := batch_rec.database_name;
+      SET V_SCHEMANAME := batch_rec.schema_name;
+
+      -- Asynchronous call to for batch to run for tables and columns descriptions
+      ASYNC(CALL prod_db_manager.inventory.APPLY_AI_GENERATED_COLUMN_DESC_STAGE(
+          :v_dbname, :v_schemaname
+        ));
+    END FOR;
+    AWAIT ALL;
+
+  RETURN 'Success';
+END;
+
+---Create Wrapper ASYNC Proc 
+CREATE OR REPLACE PROCEDURE prod_db_manager.inventory.APPLY_AI_GENERATED_COLUMN_DESC_STAGE(DATABASE_NAME STRING, SCHEMA_NAME STRING)
+  RETURNS STRING
+  LANGUAGE SQL
+  EXECUTE AS OWNER
+AS
+DECLARE
+  V_DBNAME VARCHAR(255);       -- Explicit VARCHAR length for database_name
+  V_SCHEMANAME VARCHAR(255);   -- Explicit VARCHAR length for schema_name
+  V_SQL VARCHAR;
+
+  CUR_SCHEMA CURSOR FOR
+(select distinct a.database_name, a.schema_name, z.table_name, z.column_name, concat('alter table ', z.database_name, '.', z.schema_name, '.', z.table_name, ' MODIFY COLUMN ', z.column_name, ' comment \'', replace(z.content_defenition, '\'', ''), '\';') Apply_Table_Comment
+from prod_db_manager.inventory.column_inventory z inner join prod_db_manager.inventory.schema_inventory a 
+on z.database_name = a.database_name and z.schema_name = a.schema_name inner join prod_db_manager.account_usage_snap.schemata b
+on a.database_name = b.CATALOG_NAME and a.schema_name = b.schema_name and b.DELETED is null inner join prod_db_manager.account_usage_snap.tables c
+on z.database_name = c.table_catalog and z.schema_name = c.table_schema and z.table_name = c.table_name and c.deleted is null and c.table_type = 'BASE TABLE'
+where z.content_defenition is not null and c.TABLE_OWNER = 'ENTERPRISE_ADMIN_INTERNAL_ONSHORE' and z.database_name = (?) and z.schema_name = (?));
+    
+
+BEGIN
+    -- Inner loop over schemas in the current batch
+  OPEN CUR_SCHEMA USING (DATABASE_NAME, SCHEMA_NAME);
+    FOR schema_rec IN CUR_SCHEMA DO
+      SET V_SQL := schema_rec.Apply_Table_Comment;
+
+    -- Asynchronous call to describe tables and columns
+      ASYNC(EXECUTE IMMEDIATE V_SQL);
+    END FOR;
+    -- Await all asynchronous operations
+    AWAIT ALL;
+   
+  RETURN 'Success';
+END;
