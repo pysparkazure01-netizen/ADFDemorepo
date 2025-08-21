@@ -1,4 +1,6 @@
-CREATE OR REPLACE PROCEDURE UAT_ADS.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_UPDATE(SALESFORCE_UPDATE_FROM_APP VARCHAR)
+CREATE OR REPLACE PROCEDURE UAT_ADS.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_UPDATE(
+    SALESFORCE_UPDATE_FROM_APP VARCHAR
+)
 RETURNS string
 LANGUAGE PYTHON
 RUNTIME_VERSION = 3.9
@@ -19,7 +21,10 @@ def chunk_list(lst, size):
     for i in range(0, len(lst), size):
         yield lst[i:i + size]
 
-def salesforce_contact_update_process(session: snowpark.Session, app_db, app_schema, load_nbr, chunk_size=200):
+def salesforce_contact_update_process(session: snowpark.Session, app_db, app_schema, load_nbr):
+    # Default chunk size
+    chunk_size = 200
+
     # Get credentials
     credentials = json.loads(_snowflake.get_generic_secret_string('cred'), strict=False)
     subscriptionID = credentials.get("subscriptionID")
@@ -78,20 +83,23 @@ def salesforce_contact_update_process(session: snowpark.Session, app_db, app_sch
         if contact_data_update:
             records.extend(json.loads(contact_data_update))
 
-    # Process in chunks
+    # Process in chunks of 200
     if records:
         for batch in chunk_list(records, chunk_size):
             response = requests.put(salesforce_contact_update_url, headers=headers, json=batch)
             response_text = response.text
             response_status = response.status_code
 
-            # Audit log for this batch
+            # Escape JSON/response safely for SQL
+            request_json = json.dumps(batch).replace("'", "''")
+            response_json = response_text.replace("'", "''")
+
             sf_contact_query = f"""
             INSERT INTO {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE_AUDIT_LOG
             SELECT NULL AS SALESFORCE_CONTACT_DATA_UPDATE_ID,
-                   $$ {json.dumps(batch)} $$ AS REQUEST_JSON,
+                   '{request_json}' AS REQUEST_JSON,
                    '{response_status}' AS RESPONSE_STATUS,
-                   $$ {response_text} $$ AS RESPONSE_JSON,
+                   '{response_json}' AS RESPONSE_JSON,
                    CURRENT_TIMESTAMP AS ROW_CRE_DT,
                    'SFADMIN' AS ROW_CRE_USR_ID
             """
@@ -131,8 +139,8 @@ def main(session: snowpark.Session, SALESFORCE_UPDATE_FROM_APP):
                                    FROM {app_db}.{app_schema}.SALESFORCE_CONTACT_DATA_UPDATE"""
         delta_end_date = session.sql(delta_end_date_query).collect()[0]["DELTA_END_DATE"]
 
-        # Run update process (with chunking)
-        salesforce_contact_update_process(session, app_db, app_schema, load_nbr, chunk_size=200)
+        # Run update process
+        salesforce_contact_update_process(session, app_db, app_schema, load_nbr)
 
         # Update control table
         cntrl_table_update_query = f"""
@@ -142,5 +150,5 @@ def main(session: snowpark.Session, SALESFORCE_UPDATE_FROM_APP):
         """
         session.sql(cntrl_table_update_query).collect()
 
-        return f"Salesforce Contact Update Batch Completed Successfully"
+        return f"Salesforce Contact Update Batch Completed Successfully (Chunk Size=200)"
 $$;
