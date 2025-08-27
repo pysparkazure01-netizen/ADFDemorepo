@@ -1,0 +1,7 @@
+Parallel Execution with Thread Workers
+
+Instead of processing one record → one API call → one log update in sequence, we now use a ThreadPoolExecutor with 10 worker threads.
+
+This means 10 API calls run in parallel, reducing end-to-end runtime by ~90% compared to sequential execution.
+
+Example: If 1,000 records take 1,000 seconds sequentially, they now complete in ~100 seconds.
