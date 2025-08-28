@@ -1,7 +1,89 @@
-Parallel Execution with Thread Workers
-
-Instead of processing one record → one API call → one log update in sequence, we now use a ThreadPoolExecutor with 10 worker threads.
-
-This means 10 API calls run in parallel, reducing end-to-end runtime by ~90% compared to sequential execution.
-
-Example: If 1,000 records take 1,000 seconds sequentially, they now complete in ~100 seconds.
+Traceback (most recent call last):
+  File "_udf_code.py", line 13, in main
+    contact_update_return = session.sql(contact_update_proc).collect()[0]["SALESFORCE_CONTACT_UPDATE"]
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/_internal/telemetry.py", line 181, in wrap
+    result = func(*args, **kwargs)
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/_internal/utils.py", line 1063, in call_wrapper
+    return func(*args, **kwargs)
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/dataframe.py", line 716, in collect
+    return self._internal_collect_with_tag_no_telemetry(
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/dataframe.py", line 787, in _internal_collect_with_tag_no_telemetry
+    return self._session._conn.execute(
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/_internal/server_connection.py", line 624, in execute
+    result_set, result_meta = self.get_result_set(
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/_internal/analyzer/snowflake_plan.py", line 210, in wrap
+    raise ne.with_traceback(tb) from None
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/_internal/analyzer/snowflake_plan.py", line 141, in wrap
+    return func(*args, **kwargs)
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/_internal/server_connection.py", line 746, in get_result_set
+    result = self.run_query(
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/_internal/server_connection.py", line 133, in wrap
+    raise ex
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/_internal/server_connection.py", line 127, in wrap
+    return func(*args, **kwargs)
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/_internal/server_connection.py", line 520, in run_query
+    raise ex
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/_internal/server_connection.py", line 505, in run_query
+    results_cursor = self.execute_and_notify_query_listener(
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/_internal/server_connection.py", line 446, in execute_and_notify_query_listener
+    raise ex
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/snowpark/_internal/server_connection.py", line 437, in execute_and_notify_query_listener
+    results_cursor = self._cursor.execute(query, **kwargs)
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/connector/cursor.py", line 1092, in execute
+    Error.errorhandler_wrapper(
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/connector/errors.py", line 232, in errorhandler_wrapper
+    handed_over = Error.hand_to_other_handler(
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/connector/errors.py", line 287, in hand_to_other_handler
+    cursor.errorhandler(connection, cursor, error_class, error_value)
+  File "/usr/lib/python_udf/d9d5f6f5165a6f52bc59c9f082099598cd4ce448be5853b43c7e9474a791a358/lib/python3.8/site-packages/snowflake/connector/errors.py", line 165, in default_errorhandler
+    raise error_class(
+snowflake.snowpark.exceptions.SnowparkSQLException: (1304): 01bea84b-0c0b-eb75-0001-f596a2464282: 100357 (P0000): 01bea84b-0c0b-eb75-0001-f596a2464282: Python Interpreter Error:
+Traceback (most recent call last):
+  File "_udf_code.py", line 54, in main
+    prev_delta = session.sql(prev_delta_query).collect()[0]["PREV_RUN_DELTA"]
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/_internal/telemetry.py", line 291, in wrap
+    result = func(*args, **kwargs)
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/_internal/utils.py", line 1120, in call_wrapper
+    return func(*args, **kwargs)
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/dataframe.py", line 758, in collect
+    return self._internal_collect_with_tag_no_telemetry(
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/dataframe.py", line 828, in _internal_collect_with_tag_no_telemetry
+    return self._session._conn.execute(
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/_internal/server_connection.py", line 640, in execute
+    result_set, result_meta = self.get_result_set(
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/_internal/analyzer/snowflake_plan.py", line 324, in wrap
+    node.snowflake_plan.quoted_identifiers
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/_internal/analyzer/snowflake_plan.py", line 582, in quoted_identifiers
+    return [attr.name for attr in self.attributes]
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/_internal/analyzer/snowflake_plan.py", line 601, in attributes
+    attributes = self._analyze_attributes()
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/_internal/analyzer/snowflake_plan.py", line 336, in wrap
+    raise ne.with_traceback(tb) from None
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/_internal/analyzer/snowflake_plan.py", line 177, in wrap
+    return func(*args, **kwargs)
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/_internal/analyzer/snowflake_plan.py", line 592, in _analyze_attributes
+    return analyze_attributes(self.schema_query, self.session)
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/_internal/analyzer/schema_utils.py", line 99, in analyze_attributes
+    attributes = session._get_result_attributes(sql)
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/session.py", line 2889, in _get_result_attributes
+    return self._conn.get_result_attributes(query)
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/_internal/server_connection.py", line 274, in get_result_attributes
+    self._run_new_describe(self._cursor, query), self.max_string_size
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/_internal/server_connection.py", line 280, in _run_new_describe
+    result_metadata = run_new_describe(cursor, query)
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/snowpark/_internal/analyzer/schema_utils.py", line 166, in run_new_describe
+    return cursor._describe_internal(query)  # pyright: ignore
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/connector/cursor.py", line 1137, in _describe_internal
+    self.execute(*args, **kwargs)
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/connector/cursor.py", line 1092, in execute
+    Error.errorhandler_wrapper(
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/connector/errors.py", line 232, in errorhandler_wrapper
+    handed_over = Error.hand_to_other_handler(
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/connector/errors.py", line 287, in hand_to_other_handler
+    cursor.errorhandler(connection, cursor, error_class, error_value)
+  File "/usr/lib/python_udf/545ce700eba0251e7fc08a0b9eb395738ea30101bfeb22ce5612d510661ce8eb/lib/python3.9/site-packages/snowflake/connector/errors.py", line 165, in default_errorhandler
+    raise error_class(
+snowflake.snowpark.exceptions.SnowparkSQLException: (1304): 01bea84b-0c0b-eb75-0001-f596a24642da: 000904 (42000): 01bea84b-0c0b-eb75-0001-f596a24642da: SQL compilation error: error line 3 at position 14
+invalid identifier 'SALESFORCE_UPDATE_OBJECT'
+ in function SALESFORCE_CONTACT_UPDATE with handler main
+ in function MARKETING_SALESFORCE_CONTACT_UPDATE with handler main
