@@ -1,0 +1,127 @@
+CREATE OR REPLACE PROCEDURE UAT_MARKETING_WAREHOUSE.MARKETING_REPORTS.SALESFORCE_CONTACT_MARKETING_FIELDS_CT_UPDATE_JS(
+    P_START_DATE STRING,
+    P_END_DATE   STRING
+)
+RETURNS VARCHAR
+LANGUAGE JAVASCRIPT
+EXECUTE AS OWNER
+AS
+$$
+try {
+    //
+    // First Insert (MKT_RELEVANT = 1 with comparison checks)
+    //
+    var sql_command1 = `
+        insert into UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE
+        select distinct 
+               UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_ID.nextval,
+               a.SF_CONTACT_ACCOUNT_ID,
+               a.SF_CONTACTID,
+               a.MKT_EMAIL,
+               a.MKT_TITLE,
+               a.MKT_TITLE_HIERARCHY,
+               a.MKT_MANAGEMENT_HIERARCHY,
+               a.MKT_JOB_FUNCTION,
+               a.MKT_DEPARTMENT,
+               a.MKT_DECISION_TYPE,
+               a.MKT_ENRICHMENT_ID as MKT_ENRICHMENT_ID_C,
+               a.MKT_SEGMENTATION_A,
+               a.MKT_SEGMENTATION_B,
+               a.MKT_SEGMENTATION_C,
+               a.MKT_SEGMENTATION_D,
+               a.MKT_PREDICTION_A,
+               a.MKT_PREDICTION_B,
+               a.MKT_PREDICTION_C,
+               a.MKT_PREDICTION_D,
+               a.MKT_PRIMARY_CONTACT,
+               current_timestamp(),
+               'MARKETING_DEVELOPER'
+        from (
+            select con_mat.* ,comp_mat.mkt_relevant
+            from prod_marketing_warehouse.marketing_reports.contact_matrix con_mat
+            inner join prod_marketing_warehouse.marketing_reports.company_matrix comp_mat
+              on con_mat.sf_contact_account_id=comp_mat.company_id
+            and comp_mat.mkt_relevant='1'
+        ) a
+        inner join prod_datalake.salesforce.CONTACT b
+           on a.sf_contactid=b.ID
+        where substr(a.sf_contact_create_date,1,7) between '` + P_START_DATE + `' and '` + P_END_DATE + `'
+          and (
+                nvl(to_varchar(a.MKT_ENRICHMENT_ID),'') <> nvl(b.mkt_enrichment_id__c,'')
+            or  nvl(to_varchar(a.MKT_SEGMENTATION_A),'') <> nvl(b.mkt_segmentation_A__c,'')
+            or  nvl(to_varchar(a.MKT_SEGMENTATION_B),'') <> nvl(b.mkt_segmentation_B__c,'')
+            or  nvl(to_varchar(a.MKT_SEGMENTATION_C),'') <> nvl(b.mkt_segmentation_C__c,'')
+            or  nvl(to_varchar(a.MKT_SEGMENTATION_D),'') <> nvl(b.mkt_segmentation_D__c,'')
+            or  nvl(to_varchar(a.MKT_PREDICTION_A),'') <> nvl(b.mkt_prediction_A__c,'')
+            or  nvl(to_varchar(a.MKT_PREDICTION_B),'') <> nvl(b.mkt_prediction_B__c,'')
+            or  nvl(to_varchar(a.MKT_PREDICTION_C),'') <> nvl(b.mkt_prediction_C__c,'')
+            or  nvl(to_varchar(a.MKT_PREDICTION_D),'') <> nvl(b.mkt_prediction_D__c,'')
+            or  nvl(to_varchar(a.MKT_PRIMARY_CONTACT),'') <> nvl(b.MKT_PRIMARY_CONTACT__C,'')
+            or  nvl(to_varchar(a.MKT_DECISION_TYPE),'') <> nvl(b.MKT_DECISION_TYPE__C,'')
+            or  nvl(to_varchar(a.MKT_DEPARTMENT),'') <> nvl(b.MKT_DEPARTMENT__C,'')
+            or  nvl(to_varchar(a.MKT_JOB_FUNCTION),'') <> nvl(b.MKT_JOB_FUNCTION__C,'')
+            or  nvl(to_varchar(a.MKT_MANAGEMENT_HIERARCHY),'') <> nvl(b.MKT_MANAGEMENT_HIERARCHY__C,'')
+            or  nvl(to_varchar(a.MKT_TITLE_HIERARCHY),'') <> nvl(b.MKT_TITLE_HIERARCHY__C,'')
+            or  nvl(to_varchar(a.MKT_TITLE),'') <> nvl(b.MKT_TITLE__C,'')
+            or  nvl(to_varchar(a.MKT_EMAIL),'') <> nvl(b.MKT_EMAIL__C,'')
+          )
+    `;
+    snowflake.execute({sqlText: sql_command1});
+
+
+    //
+    // Second Insert (MKT_RELEVANT = 0)
+    //
+    var sql_command2 = `
+        insert into UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE
+        select distinct 
+               UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_ID.nextval,
+               a.SF_CONTACT_ACCOUNT_ID,
+               a.SF_CONTACTID,
+               a.MKT_EMAIL,
+               a.MKT_TITLE,
+               a.MKT_TITLE_HIERARCHY,
+               a.MKT_MANAGEMENT_HIERARCHY,
+               a.MKT_JOB_FUNCTION,
+               a.MKT_DEPARTMENT,
+               a.MKT_DECISION_TYPE,
+               a.MKT_ENRICHMENT_ID as MKT_ENRICHMENT_ID_C,
+               a.MKT_SEGMENTATION_A,
+               a.MKT_SEGMENTATION_B,
+               a.MKT_SEGMENTATION_C,
+               a.MKT_SEGMENTATION_D,
+               a.MKT_PREDICTION_A,
+               a.MKT_PREDICTION_B,
+               a.MKT_PREDICTION_C,
+               a.MKT_PREDICTION_D,
+               a.MKT_PRIMARY_CONTACT,
+               current_timestamp(),
+               'MARKETING_DEVELOPER'
+        from (
+            select con_mat.* ,comp_mat.mkt_relevant
+            from prod_marketing_warehouse.marketing_reports.contact_matrix con_mat
+            inner join prod_marketing_warehouse.marketing_reports.company_matrix comp_mat
+              on con_mat.sf_contact_account_id=comp_mat.company_id
+            and comp_mat.mkt_relevant='0'
+        ) a
+        inner join prod_datalake.salesforce.CONTACT b
+           on a.sf_contactid=b.ID
+        where substr(a.sf_contact_create_date,1,7) between '` + P_START_DATE + `' and '` + P_END_DATE + `'
+    `;
+    snowflake.execute({sqlText: sql_command2});
+
+
+    //
+    // Call downstream procedure
+    //
+    var downstream_call = "call UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.MARKETING_SALESFORCE_CONTACT_UPDATE()";
+    snowflake.execute({sqlText: downstream_call});
+
+    return "SUCCESSFULLY COMPLETED";
+
+} catch(err) {
+    return "Error: " + err.message;
+}
+$$;
+
+CALL UAT_MARKETING_WAREHOUSE.MARKETING_REPORTS.SALESFORCE_CONTACT_MARKETING_FIELDS_CT_UPDATE_JS('2006-01','2010-12');
