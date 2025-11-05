@@ -1,0 +1,143 @@
+-- Take a backup of current procedure: PROD_MARKETING_WAREHOUSE.MARKETING_REPORTS.SALESFORCE_CONTACT_MARKETING_FIELDS_CT_UPDATE()
+USE ROLE ENTERPRISE_ADMIN_INTERNAL_ONSHORE;
+
+CREATE OR REPLACE PROCEDURE PROD_MARKETING_WAREHOUSE.MARKETING_REPORTS.SALESFORCE_CONTACT_MARKETING_FIELDS_CT_UPDATE()
+RETURNS VARCHAR
+LANGUAGE JAVASCRIPT
+EXECUTE AS OWNER
+AS
+$$
+try {
+    //
+    // First Insert (MKT_RELEVANT = 1 with comparison checks)
+    //
+    var sql_command1 = `
+        INSERT INTO PROD_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE
+        SELECT DISTINCT 
+               PROD_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_ID.nextval,
+               filtered.SF_CONTACT_ACCOUNT_ID,
+               filtered.SF_CONTACTID,
+               filtered.MKT_EMAIL,
+               filtered.MKT_TITLE,
+               filtered.MKT_TITLE_HIERARCHY,
+               filtered.MKT_MANAGEMENT_HIERARCHY,
+               filtered.MKT_JOB_FUNCTION,
+               filtered.MKT_DEPARTMENT,
+               filtered.MKT_DECISION_TYPE,
+               filtered.MKT_ENRICHMENT_ID AS MKT_ENRICHMENT_ID_C,
+               filtered.MKT_SEGMENTATION_A,
+               filtered.MKT_SEGMENTATION_B,
+               filtered.MKT_SEGMENTATION_C,
+               filtered.MKT_SEGMENTATION_D,
+               filtered.MKT_PREDICTION_A,
+               filtered.MKT_PREDICTION_B,
+               filtered.MKT_PREDICTION_C,
+               filtered.MKT_PREDICTION_D,
+               filtered.MKT_PRIMARY_CONTACT,
+               CURRENT_TIMESTAMP(),
+               'MARKETING_DEVELOPER'
+        FROM (
+            SELECT a.*
+            FROM (
+                SELECT con_mat.*, comp_mat.mkt_relevant
+                FROM prod_marketing_warehouse.marketing_reports.contact_matrix con_mat
+                INNER JOIN prod_marketing_warehouse.marketing_reports.company_matrix comp_mat
+                  ON con_mat.sf_contact_account_id = comp_mat.company_id
+                WHERE comp_mat.mkt_relevant = '1'
+            ) a
+            INNER JOIN PROD_DATALAKE.SALESFORCE.CONTACT b
+               ON a.SF_CONTACTID = b.ID
+            WHERE 
+                NVL(TO_VARCHAR(a.MKT_ENRICHMENT_ID), '') <> NVL(b.mkt_enrichment_id__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_SEGMENTATION_A), '') <> NVL(b.mkt_segmentation_A__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_SEGMENTATION_B), '') <> NVL(b.mkt_segmentation_B__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_SEGMENTATION_C), '') <> NVL(b.mkt_segmentation_C__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_SEGMENTATION_D), '') <> NVL(b.mkt_segmentation_D__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_PREDICTION_A), '') <> NVL(b.mkt_prediction_A__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_PREDICTION_B), '') <> NVL(b.mkt_prediction_B__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_PREDICTION_C), '') <> NVL(b.mkt_prediction_C__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_PREDICTION_D), '') <> NVL(b.mkt_prediction_D__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_PRIMARY_CONTACT), '') <> NVL(b.MKT_PRIMARY_CONTACT__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_DECISION_TYPE), '') <> NVL(b.MKT_DECISION_TYPE__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_DEPARTMENT), '') <> NVL(b.MKT_DEPARTMENT__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_JOB_FUNCTION), '') <> NVL(b.MKT_JOB_FUNCTION__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_MANAGEMENT_HIERARCHY), '') <> NVL(b.MKT_MANAGEMENT_HIERARCHY__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_TITLE_HIERARCHY), '') <> NVL(b.MKT_TITLE_HIERARCHY__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_TITLE), '') <> NVL(b.MKT_TITLE__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_EMAIL), '') <> NVL(b.MKT_EMAIL__C, '')
+        ) filtered`;
+
+    snowflake.execute({sqlText: sql_command1});
+
+    //
+    // Second Insert (MKT_RELEVANT = 0 with comparison checks)
+    //
+    var sql_command2 = `
+        INSERT INTO PROD_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE
+        SELECT DISTINCT 
+               PROD_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_ID.nextval,
+               filtered.SF_CONTACT_ACCOUNT_ID,
+               filtered.SF_CONTACTID,
+               filtered.MKT_EMAIL,
+               filtered.MKT_TITLE,
+               filtered.MKT_TITLE_HIERARCHY,
+               filtered.MKT_MANAGEMENT_HIERARCHY,
+               filtered.MKT_JOB_FUNCTION,
+               filtered.MKT_DEPARTMENT,
+               filtered.MKT_DECISION_TYPE,
+               filtered.MKT_ENRICHMENT_ID AS MKT_ENRICHMENT_ID_C,
+               filtered.MKT_SEGMENTATION_A,
+               filtered.MKT_SEGMENTATION_B,
+               filtered.MKT_SEGMENTATION_C,
+               filtered.MKT_SEGMENTATION_D,
+               filtered.MKT_PREDICTION_A,
+               filtered.MKT_PREDICTION_B,
+               filtered.MKT_PREDICTION_C,
+               filtered.MKT_PREDICTION_D,
+               filtered.MKT_PRIMARY_CONTACT,
+               CURRENT_TIMESTAMP(),
+               'MARKETING_DEVELOPER'
+        FROM (
+            SELECT a.*
+            FROM (
+                SELECT con_mat.*, comp_mat.mkt_relevant
+                FROM prod_marketing_warehouse.marketing_reports.contact_matrix con_mat
+                INNER JOIN prod_marketing_warehouse.marketing_reports.company_matrix comp_mat
+                  ON con_mat.sf_contact_account_id = comp_mat.company_id
+                WHERE comp_mat.mkt_relevant = '0'
+            ) a
+            INNER JOIN prod_datalake.salesforce.CONTACT b
+               ON a.sf_contactid = b.ID
+            WHERE 
+                NVL(TO_VARCHAR(a.MKT_ENRICHMENT_ID), '') <> NVL(b.mkt_enrichment_id__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_SEGMENTATION_A), '') <> NVL(b.mkt_segmentation_A__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_SEGMENTATION_B), '') <> NVL(b.mkt_segmentation_B__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_SEGMENTATION_C), '') <> NVL(b.mkt_segmentation_C__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_SEGMENTATION_D), '') <> NVL(b.mkt_segmentation_D__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_PREDICTION_A), '') <> NVL(b.mkt_prediction_A__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_PREDICTION_B), '') <> NVL(b.mkt_prediction_B__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_PREDICTION_C), '') <> NVL(b.mkt_prediction_C__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_PREDICTION_D), '') <> NVL(b.mkt_prediction_D__c, '') OR
+                NVL(TO_VARCHAR(a.MKT_PRIMARY_CONTACT), '') <> NVL(b.MKT_PRIMARY_CONTACT__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_DECISION_TYPE), '') <> NVL(b.MKT_DECISION_TYPE__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_DEPARTMENT), '') <> NVL(b.MKT_DEPARTMENT__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_JOB_FUNCTION), '') <> NVL(b.MKT_JOB_FUNCTION__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_MANAGEMENT_HIERARCHY), '') <> NVL(b.MKT_MANAGEMENT_HIERARCHY__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_TITLE_HIERARCHY), '') <> NVL(b.MKT_TITLE_HIERARCHY__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_TITLE), '') <> NVL(b.MKT_TITLE__C, '') OR
+                NVL(TO_VARCHAR(a.MKT_EMAIL), '') <> NVL(b.MKT_EMAIL__C, '')
+        ) filtered`;
+
+    snowflake.execute({sqlText: sql_command2});
+
+    //
+    // Call downstream procedure
+    //
+    var downstream_call = "CALL PROD_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.MARKETING_SALESFORCE_CONTACT_UPDATE()";
+    snowflake.execute({sqlText: downstream_call});
+
+    return "SUCCESSFULLY COMPLETED";
+} catch (err) {
+    return "ERROR: " + err.message;
+}
+$$;
