@@ -1,0 +1,13 @@
+SELECT a.ID, a.mkt_relevant__c, b.MKT_RELEVANT
+FROM PROD_DATALAKE.SALESFORCE.ACCOUNT a
+JOIN COMPANY_MATRIX b ON a.ID = b.COMPANY_ID
+WHERE NVL(b.MKT_RELEVANT, '0') = '0'
+  AND NVL(a.mkt_relevant__c, '0') = '1';
+Accounts in Matrix=1, SFDC=0 (should activate)
+sql
+Copy code
+SELECT a.ID, a.mkt_relevant__c, b.MKT_RELEVANT
+FROM PROD_DATALAKE.SALESFORCE.ACCOUNT a
+JOIN COMPANY_MATRIX b ON a.ID = b.COMPANY_ID
+WHERE NVL(b.MKT_RELEVANT, '0') = '1'
+  AND NVL(a.mkt_relevant__c, '0') = '0';
