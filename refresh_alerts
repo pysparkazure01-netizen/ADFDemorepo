@@ -1,0 +1,51 @@
+CREATE OR REPLACE PROCEDURE DEV_FRAUD_WAREHOUSE.HUMMINGBIRD_ALERTS_ENT.UPSERT_ALERTS()
+RETURNS STRING
+LANGUAGE SQL
+EXECUTE AS OWNER
+AS
+$$
+DECLARE
+    VAR_SUCCESS_MESSAGE STRING;
+BEGIN
+    VAR_SUCCESS_MESSAGE := 'SUCCESSFULLY COMPLETED';
+
+    --------------------------------------------------------------------
+    -- INSERT ONLY NEWLY CREATED ALERTS FROM MONITORING_ENT.ALERTS
+    -- INTO HUMMINGBIRD_ALERTS_ENT.ALERTS
+    --------------------------------------------------------------------
+
+    INSERT INTO DEV_FRAUD_WAREHOUSE.HUMMINGBIRD_ALERTS_ENT.ALERTS
+    (
+        HB_ALERTS_ID,
+        ID,
+        TRIGGERED_AT,
+        RULE,
+        REFERENCES,
+        OTHER_INFO,
+        SOURCESYSTEMID,
+        SRC_UNIQ_CD,
+        ROW_CRE_DT,
+        ROW_MOD_DT,
+        EXCLUSION_FLAG
+    )
+    SELECT
+        A.HB_ALERTS_ID,
+        A.ID,
+        A.TRIGGERED_AT,
+        A.RULE,
+        A.REFERENCES,
+        A.OTHER_INFO,
+        A.SOURCESYSTEMID,
+        A.SRC_UNIQ_CD,
+        A.ROW_CRE_DT,
+        A.ROW_MOD_DT,
+        A.EXCLUSION_FLAG
+    FROM DEV_FRAUD_WAREHOUSE.MONITORING_ENT.ALERTS A
+    LEFT JOIN DEV_FRAUD_WAREHOUSE.HUMMINGBIRD_ALERTS_ENT.ALERTS B
+        ON A.SRC_UNIQ_CD = B.SRC_UNIQ_CD   -- <== Match on unique ID
+    WHERE B.SRC_UNIQ_CD IS NULL           -- <== Insert only NEW IDs
+      AND A.RULE = 'Common Accounts Payable ACH';  -- IF you want rule filter
+
+    RETURN VAR_SUCCESS_MESSAGE;
+END;
+$$;
