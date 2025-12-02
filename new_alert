@@ -1,0 +1,82 @@
+ FINAL_SELECT AS
+  (
+    SELECT
+      NULL::NUMBER AS HB_ALERTS_ID, -- set to NULL so we can assign sequence.nextval only for new inserts
+      CONCAT(RULES.RULE_ID,'_',FINAL_ARRAY.PROVIDER_GROUP_ID) AS ID,
+      -- TRIGGERED_AT will be set from row_cre_dt later when staging; we don't force it here
+      RULES.RULE,
+      ARRAY_FLATTEN(ARRAY_UNIQUE_AGG(FINAL_ARRAY.REFERENCES)) AS REFERENCES,
+      ARRAY_FLATTEN(ARRAY_UNIQUE_AGG(FINAL_ARRAY.OTHER_INFO)) AS OTHER_INFO
+    FROM FINAL_ARRAY
+    INNER JOIN (VALUES ('EXT-PMT-0002', 'Provider Reviews Based on VCC Activity')) AS RULES (RULE_ID, RULE)
+      -- If you require a SOURCE_SYSTEM column to map to PLATFORM.SOURCESYSTEM,
+      -- ensure FINAL_ARRAY or RULES provides it. For now we assume a mapping will exist downstream.
+    GROUP BY FINAL_ARRAY.PROVIDER_GROUP_ID, RULES.RULE_ID, RULES.RULE
+  )
+
+  -- End CTEs and do the final select into the staging table
+  SELECT
+    -- Use the CASE on HB_ALERTS_ID that you previously had: if HB_ALERTS_ID is NULL,
+    -- assign the sequence; if not, keep existing (kept for backward-compatibility).
+    CASE
+      WHEN a.HB_ALERTS_ID IS NULL THEN DEV_FRAUD_WAREHOUSE.FRAUD_REPORTS_ENT.HB_ALERTS_ID.nextval
+      ELSE a.HB_ALERTS_ID
+    END AS HB_ALERTS_ID,
+    a.ID,
+    a.RULE,
+    -- We set TRIGGERED_AT to NULL here and will set it using row_cre_dt below.
+    NULL AS TRIGGERED_AT,
+    a.REFERENCES,
+    a.OTHER_INFO,
+    b.SOURCESYSTEMID,
+    CONCAT(b.SOURCESYSTEMID, '_', a.ID) AS src_uniq_cd_gen,
+    C.src_uniq_cd,
+    -- If the alert already exists, preserve its original row_cre_dt; otherwise set current timestamp.
+    CASE WHEN C.src_uniq_cd IS NULL THEN CURRENT_TIMESTAMP() ELSE C.row_cre_dt END AS row_cre_dt,
+    CURRENT_TIMESTAMP() AS row_mod_dt,
+    'N' AS EXCLUSION_FLAG
+  FROM FINAL_SELECT a
+  INNER JOIN PROD_ZDI_REFERENCES.PLATFORM.SOURCESYSTEM b
+    ON a.SOURCE_SYSTEM = b.SOURCESYSTEMNAME  -- NOTE: ensure FINAL_SELECT yields SOURCE_SYSTEM (if not, add)
+  LEFT JOIN DEV_FRAUD_WAREHOUSE.MONITORING_ENT.ALERTS C
+    ON CONCAT(b.SOURCESYSTEMID, '_', a.ID) = C.src_uniq_cd
+  ;
+
+  ----------------------------------------------------------------
+  -- Upsert/Insert into ALERTS
+  --  - DO NOT DELETE existing rows
+  --  - INSERT only those from staging that are NOT already present in ALERTS
+  --  - Ensure TRIGGERED_AT = row_cre_dt (so the triggered_at always reflects creation)
+  ----------------------------------------------------------------
+
+  INSERT INTO DEV_FRAUD_WAREHOUSE.MONITORING_ENT.ALERTS (
+    HB_ALERTS_ID,
+    ID,
+    TRIGGERED_AT,
+    RULE,
+    REFERENCES,
+    OTHER_INFO,
+    SOURCESYSTEMID,
+    SRC_UNIQ_CD,
+    ROW_CRE_DT,
+    ROW_MOD_DT,
+    EXCLUSION_FLAG
+  )
+  SELECT
+    -- For new inserts: use the HB_ALERTS_ID present in staging (which will be sequence-generated)
+    A.HB_ALERTS_ID,
+    A.ID,
+    -- Set TRIGGERED_AT to the computed row_cre_dt so it reflects creation time
+    A.row_cre_dt AS TRIGGERED_AT,
+    A.RULE,
+    A.REFERENCES,
+    A.OTHER_INFO,
+    A.SOURCESYSTEMID,
+    A.src_uniq_cd_gen AS SRC_UNIQ_CD,
+    A.row_cre_dt,
+    A.row_mod_dt,
+    A.EXCLUSION_FLAG
+  FROM DEV_FRAUD_WAREHOUSE.FRAUD_REPORTS_ENT.STG_COMM_ACCT_PAYBLE A
+  LEFT JOIN DEV_FRAUD_WAREHOUSE.MONITORING_ENT.ALERTS EXIST
+    ON A.src_uniq_cd_gen = EXIST.src_uniq_cd
+  WHERE EXIST.src_uniq_cd IS NULL;  -- only insert when no existing alert for this src_uniq_cd
