@@ -1,0 +1,63 @@
+CREATE OR REPLACE PROCEDURE DEV_FRAUD_WAREHOUSE.HUMMINGBIRD_ALERTS_ENT.TAKE_ALERTS_SNAPSHOT()
+RETURNS STRING
+LANGUAGE SQL
+EXECUTE AS OWNER
+AS
+$$
+DECLARE 
+    VAR_SUCCESS_MESSAGE STRING;
+BEGIN
+    VAR_SUCCESS_MESSAGE := 'SNAPSHOT COMPLETED';
+
+    ----------------------------------------------------------------------
+    -- 1. CREATE SNAPSHOT TABLE IF NOT EXISTS
+    ----------------------------------------------------------------------
+    CREATE TABLE IF NOT EXISTS DEV_FRAUD_WAREHOUSE.HUMMINGBIRD_ALERTS_ENT.ALERTS_SNAPSHOT AS
+    SELECT 
+        *,
+        CURRENT_DATE AS SNAP_CRE_DT
+    FROM DEV_FRAUD_WAREHOUSE.HUMMINGBIRD_ALERTS_ENT.ALERTS
+    WHERE 1 = 0;  -- create empty structure only
+
+    ----------------------------------------------------------------------
+    -- 2. INSERT DAILY SNAPSHOT
+    ----------------------------------------------------------------------
+    INSERT INTO DEV_FRAUD_WAREHOUSE.HUMMINGBIRD_ALERTS_ENT.ALERTS_SNAPSHOT
+    (
+        HB_ALERTS_ID,
+        ID,
+        TRIGGERED_AT,
+        RULE,
+        REFERENCES,
+        OTHER_INFO,
+        SOURCESYSTEMID,
+        SRC_UNIQ_CD,
+        ROW_CRE_DT,
+        ROW_MOD_DT,
+        EXCLUSION_FLAG,
+        SNAP_CRE_DT      -- extra snapshot timestamp
+    )
+    SELECT
+        HB_ALERTS_ID,
+        ID,
+        TRIGGERED_AT,
+        RULE,
+        REFERENCES,
+        OTHER_INFO,
+        SOURCESYSTEMID,
+        SRC_UNIQ_CD,
+        ROW_CRE_DT,
+        ROW_MOD_DT,
+        EXCLUSION_FLAG,
+        CURRENT_DATE AS SNAP_CRE_DT
+    FROM DEV_FRAUD_WAREHOUSE.HUMMINGBIRD_ALERTS_ENT.ALERTS;
+
+    ----------------------------------------------------------------------
+    -- 3. CLEANUP SNAPSHOTS OLDER THAN 7 DAYS
+    ----------------------------------------------------------------------
+    DELETE FROM DEV_FRAUD_WAREHOUSE.HUMMINGBIRD_ALERTS_ENT.ALERTS_SNAPSHOT
+    WHERE SNAP_CRE_DT < DATEADD('DAY', -7, CURRENT_DATE);
+
+    RETURN VAR_SUCCESS_MESSAGE;
+END;
+$$;
