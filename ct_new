@@ -1,0 +1,216 @@
+CREATE OR REPLACE TABLE UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+(
+    STG_ID                NUMBER AUTOINCREMENT,
+    BATCH_ID              NUMBER,
+    PROCESS_FLAG          STRING DEFAULT 'N',
+
+    SF_CONTACT_ACCOUNT_ID STRING,
+    SF_CONTACTID          STRING,
+    MKT_EMAIL             STRING,
+    MKT_TITLE             STRING,
+    MKT_TITLE_HIERARCHY   STRING,
+    MKT_MANAGEMENT_HIERARCHY STRING,
+    MKT_JOB_FUNCTION      STRING,
+    MKT_DEPARTMENT        STRING,
+    MKT_DECISION_TYPE     STRING,
+    MKT_ENRICHMENT_ID_C   STRING,
+    MKT_SEGMENTATION_A    STRING,
+    MKT_SEGMENTATION_B    STRING,
+    MKT_SEGMENTATION_C    STRING,
+    MKT_SEGMENTATION_D    STRING,
+    MKT_PREDICTION_A      STRING,
+    MKT_PREDICTION_B      STRING,
+    MKT_PREDICTION_C      STRING,
+    MKT_PREDICTION_D      STRING,
+    MKT_PRIMARY_CONTACT   STRING,
+
+    CREATED_TS            TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
+);
+
+
+---------------------------
+  CREATE OR REPLACE PROCEDURE UAT_MARKETING_WAREHOUSE.MARKETING_REPORTS.SALESFORCE_CONTACT_MARKETING_FIELDS_CT_UPDATE()
+RETURNS STRING
+LANGUAGE JAVASCRIPT
+EXECUTE AS OWNER
+AS
+$$
+try {
+
+    /**********************************************************
+     * STEP 0: TRUNCATE STAGING TABLE (EVERY SCHEDULED RUN)
+     **********************************************************/
+    snowflake.execute({
+        sqlText: `
+            TRUNCATE TABLE
+            UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+        `
+    });
+
+    /**********************************************************
+     * STEP 1: INSERT INTO STAGING WITH 5000-ROW BATCHING
+     **********************************************************/
+    var insert_stg_sql = `
+        INSERT INTO UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+        (
+            BATCH_ID,
+            SF_CONTACT_ACCOUNT_ID,
+            SF_CONTACTID,
+            MKT_EMAIL,
+            MKT_TITLE,
+            MKT_TITLE_HIERARCHY,
+            MKT_MANAGEMENT_HIERARCHY,
+            MKT_JOB_FUNCTION,
+            MKT_DEPARTMENT,
+            MKT_DECISION_TYPE,
+            MKT_ENRICHMENT_ID_C,
+            MKT_SEGMENTATION_A,
+            MKT_SEGMENTATION_B,
+            MKT_SEGMENTATION_C,
+            MKT_SEGMENTATION_D,
+            MKT_PREDICTION_A,
+            MKT_PREDICTION_B,
+            MKT_PREDICTION_C,
+            MKT_PREDICTION_D,
+            MKT_PRIMARY_CONTACT
+        )
+        SELECT
+            CEIL(ROW_NUMBER() OVER (ORDER BY SF_CONTACTID) / 5000) AS BATCH_ID,
+            SF_CONTACT_ACCOUNT_ID,
+            SF_CONTACTID,
+            MKT_EMAIL,
+            MKT_TITLE,
+            MKT_TITLE_HIERARCHY,
+            MKT_MANAGEMENT_HIERARCHY,
+            MKT_JOB_FUNCTION,
+            MKT_DEPARTMENT,
+            MKT_DECISION_TYPE,
+            MKT_ENRICHMENT_ID,
+            MKT_SEGMENTATION_A,
+            MKT_SEGMENTATION_B,
+            MKT_SEGMENTATION_C,
+            MKT_SEGMENTATION_D,
+            MKT_PREDICTION_A,
+            MKT_PREDICTION_B,
+            MKT_PREDICTION_C,
+            MKT_PREDICTION_D,
+            MKT_PRIMARY_CONTACT
+        FROM
+        (
+            SELECT a.*
+            FROM
+            (
+                SELECT con_mat.*, comp_mat.mkt_relevant
+                FROM UAT_MARKETING_WAREHOUSE.MARKETING_REPORTS.CONTACT_MATRIX con_mat
+                JOIN UAT_MARKETING_WAREHOUSE.MARKETING_REPORTS.COMPANY_MATRIX comp_mat
+                  ON con_mat.sf_contact_account_id = comp_mat.company_id
+            ) a
+            JOIN PROD_DATALAKE.SALESFORCE.CONTACT b
+              ON a.sf_contactid = b.id
+            WHERE
+                NVL(TO_VARCHAR(a.MKT_ENRICHMENT_ID),'') <> NVL(b.mkt_enrichment_id__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_SEGMENTATION_A),'') <> NVL(b.mkt_segmentation_a__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_SEGMENTATION_B),'') <> NVL(b.mkt_segmentation_b__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_SEGMENTATION_C),'') <> NVL(b.mkt_segmentation_c__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_SEGMENTATION_D),'') <> NVL(b.mkt_segmentation_d__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_PREDICTION_A),'') <> NVL(b.mkt_prediction_a__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_PREDICTION_B),'') <> NVL(b.mkt_prediction_b__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_PREDICTION_C),'') <> NVL(b.mkt_prediction_c__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_PREDICTION_D),'') <> NVL(b.mkt_prediction_d__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_PRIMARY_CONTACT),'') <> NVL(b.mkt_primary_contact__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_DECISION_TYPE),'') <> NVL(b.mkt_decision_type__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_DEPARTMENT),'') <> NVL(b.mkt_department__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_JOB_FUNCTION),'') <> NVL(b.mkt_job_function__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_MANAGEMENT_HIERARCHY),'') <> NVL(b.mkt_management_hierarchy__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_TITLE_HIERARCHY),'') <> NVL(b.mkt_title_hierarchy__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_TITLE),'') <> NVL(b.mkt_title__c,'')
+                OR NVL(TO_VARCHAR(a.MKT_EMAIL),'') <> NVL(b.mkt_email__c,'')
+        )
+    `;
+    snowflake.execute({ sqlText: insert_stg_sql });
+
+    /**********************************************************
+     * STEP 2: PROCESS EACH BATCH SEQUENTIALLY
+     **********************************************************/
+    var batch_rs = snowflake.execute({
+        sqlText: `
+            SELECT DISTINCT BATCH_ID
+            FROM UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+            WHERE PROCESS_FLAG = 'N'
+            ORDER BY BATCH_ID
+        `
+    });
+
+    while (batch_rs.next()) {
+
+        var batchId = batch_rs.getColumnValue(1);
+
+        snowflake.execute({
+            sqlText: `
+                UPDATE UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+                SET PROCESS_FLAG = 'P'
+                WHERE BATCH_ID = ${batchId}
+            `
+        });
+
+        snowflake.execute({
+            sqlText: `
+                INSERT INTO UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE
+                SELECT
+                    UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_ID.NEXTVAL,
+                    SF_CONTACT_ACCOUNT_ID,
+                    SF_CONTACTID,
+                    MKT_EMAIL,
+                    MKT_TITLE,
+                    MKT_TITLE_HIERARCHY,
+                    MKT_MANAGEMENT_HIERARCHY,
+                    MKT_JOB_FUNCTION,
+                    MKT_DEPARTMENT,
+                    MKT_DECISION_TYPE,
+                    MKT_ENRICHMENT_ID_C,
+                    MKT_SEGMENTATION_A,
+                    MKT_SEGMENTATION_B,
+                    MKT_SEGMENTATION_C,
+                    MKT_SEGMENTATION_D,
+                    MKT_PREDICTION_A,
+                    MKT_PREDICTION_B,
+                    MKT_PREDICTION_C,
+                    MKT_PREDICTION_D,
+                    MKT_PRIMARY_CONTACT,
+                    CURRENT_TIMESTAMP(),
+                    'MARKETING_DEVELOPER'
+                FROM UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+                WHERE BATCH_ID = ${batchId}
+            `
+        });
+
+        snowflake.execute({
+            sqlText: `
+                CALL UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.MARKETING_SALESFORCE_CONTACT_UPDATE()
+            `
+        });
+
+        snowflake.execute({
+            sqlText: `
+                UPDATE UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+                SET PROCESS_FLAG = 'C'
+                WHERE BATCH_ID = ${batchId}
+            `
+        });
+    }
+
+    return 'SUCCESS – STG TRUNCATED, ALL BATCHES PROCESSED';
+
+} catch (err) {
+
+    snowflake.execute({
+        sqlText: `
+            UPDATE UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+            SET PROCESS_FLAG = 'E'
+            WHERE PROCESS_FLAG = 'P'
+        `
+    });
+
+    return 'ERROR: ' + err.message;
+}
+$$;
