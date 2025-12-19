@@ -1,0 +1,51 @@
+DECLARE
+    rs RESULTSET;
+    v_batch_id NUMBER;
+BEGIN
+    ------------------------------------------------------------------
+    -- STEP 2: PROCESS BATCHES + CALL DOWNSTREAM + 2-MIN SLEEP
+    ------------------------------------------------------------------
+    rs := (
+        SELECT DISTINCT BATCH_ID
+        FROM UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+        ORDER BY BATCH_ID
+    );
+
+    WHILE (rs.next()) DO
+        v_batch_id := rs.getColumnValue(1);
+
+        INSERT INTO UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE
+        SELECT
+            UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_ID.NEXTVAL,
+            SF_CONTACT_ACCOUNT_ID,
+            SF_CONTACTID,
+            MKT_EMAIL,
+            MKT_TITLE,
+            MKT_TITLE_HIERARCHY,
+            MKT_MANAGEMENT_HIERARCHY,
+            MKT_JOB_FUNCTION,
+            MKT_DEPARTMENT,
+            MKT_DECISION_TYPE,
+            MKT_ENRICHMENT_ID_C,
+            MKT_SEGMENTATION_A,
+            MKT_SEGMENTATION_B,
+            MKT_SEGMENTATION_C,
+            MKT_SEGMENTATION_D,
+            MKT_PREDICTION_A,
+            MKT_PREDICTION_B,
+            MKT_PREDICTION_C,
+            MKT_PREDICTION_D,
+            MKT_PRIMARY_CONTACT,
+            CURRENT_TIMESTAMP(),
+            'MARKETING_DEVELOPER'
+        FROM UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+        WHERE BATCH_ID = v_batch_id;
+
+        CALL UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.MARKETING_SALESFORCE_CONTACT_UPDATE();
+
+        -- Sleep 2 minutes between batches
+        CALL SYSTEM$WAIT(120);
+    END WHILE;
+
+    RETURN 'SUCCESSFULLY COMPLETED (UAT, SQL ONLY)';
+END;
