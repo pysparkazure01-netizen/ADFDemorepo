@@ -1,0 +1,240 @@
+CREATE OR REPLACE PROCEDURE
+UAT_MARKETING_WAREHOUSE.MARKETING_REPORTS.SALESFORCE_CONTACT_MARKETING_FIELDS_CT_UPDATE()
+RETURNS STRING
+LANGUAGE JAVASCRIPT
+EXECUTE AS OWNER
+AS
+$$
+try {
+
+    snowflake.execute({ sqlText: `SELECT 'START: Procedure execution started'` });
+
+    snowflake.execute({
+        sqlText: `
+            TRUNCATE TABLE
+            UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+        `
+    });
+
+    snowflake.execute({ sqlText: `SELECT 'STEP 1 COMPLETE: STG truncated'` });
+
+    /*LOAD STG WITH PROCESS_FLAG = 'N'*/
+	
+    var insert_stg_sql = `
+        INSERT INTO UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+        (
+            BATCH_ID,
+            PROCESS_FLAG,
+            SF_CONTACT_ACCOUNT_ID,
+            SF_CONTACTID,
+            MKT_EMAIL,
+            MKT_TITLE,
+            MKT_TITLE_HIERARCHY,
+            MKT_MANAGEMENT_HIERARCHY,
+            MKT_JOB_FUNCTION,
+            MKT_DEPARTMENT,
+            MKT_DECISION_TYPE,
+            MKT_ENRICHMENT_ID_C,
+            MKT_SEGMENTATION_A,
+            MKT_SEGMENTATION_B,
+            MKT_SEGMENTATION_C,
+            MKT_SEGMENTATION_D,
+            MKT_PREDICTION_A,
+            MKT_PREDICTION_B,
+            MKT_PREDICTION_C,
+            MKT_PREDICTION_D,
+            MKT_PRIMARY_CONTACT
+        )
+        SELECT
+            CEIL(ROW_NUMBER() OVER (ORDER BY SF_CONTACTID) / 2500) AS BATCH_ID,
+            'N' AS PROCESS_FLAG,
+            *
+        FROM
+        (
+            -- MKT_RELEVANT = '1'
+            SELECT
+                a.SF_CONTACT_ACCOUNT_ID,
+                a.SF_CONTACTID,
+                a.MKT_EMAIL,
+                a.MKT_TITLE,
+                a.MKT_TITLE_HIERARCHY,
+                a.MKT_MANAGEMENT_HIERARCHY,
+                a.MKT_JOB_FUNCTION,
+                a.MKT_DEPARTMENT,
+                a.MKT_DECISION_TYPE,
+                a.MKT_ENRICHMENT_ID AS MKT_ENRICHMENT_ID_C,
+                a.MKT_SEGMENTATION_A,
+                a.MKT_SEGMENTATION_B,
+                a.MKT_SEGMENTATION_C,
+                a.MKT_SEGMENTATION_D,
+                a.MKT_PREDICTION_A,
+                a.MKT_PREDICTION_B,
+                a.MKT_PREDICTION_C,
+                a.MKT_PREDICTION_D,
+                a.MKT_PRIMARY_CONTACT
+            FROM UAT_MARKETING_WAREHOUSE.MARKETING_REPORTS.CONTACT_MATRIX a
+            JOIN UAT_MARKETING_WAREHOUSE.MARKETING_REPORTS.COMPANY_MATRIX c
+              ON a.SF_CONTACT_ACCOUNT_ID = c.COMPANY_ID
+            JOIN PROD_DATALAKE.SALESFORCE.CONTACT b
+              ON a.SF_CONTACTID = b.ID
+            WHERE c.MKT_RELEVANT = '1'
+              AND NVL(TO_VARCHAR(a.MKT_EMAIL),'') <> NVL(b.MKT_EMAIL__C,'')
+
+            UNION ALL
+
+            -- MKT_RELEVANT = '0'
+            SELECT
+                a.SF_CONTACT_ACCOUNT_ID,
+                a.SF_CONTACTID,
+                a.MKT_EMAIL,
+                a.MKT_TITLE,
+                a.MKT_TITLE_HIERARCHY,
+                a.MKT_MANAGEMENT_HIERARCHY,
+                a.MKT_JOB_FUNCTION,
+                a.MKT_DEPARTMENT,
+                a.MKT_DECISION_TYPE,
+                a.MKT_ENRICHMENT_ID AS MKT_ENRICHMENT_ID_C,
+                a.MKT_SEGMENTATION_A,
+                a.MKT_SEGMENTATION_B,
+                a.MKT_SEGMENTATION_C,
+                a.MKT_SEGMENTATION_D,
+                a.MKT_PREDICTION_A,
+                a.MKT_PREDICTION_B,
+                a.MKT_PREDICTION_C,
+                a.MKT_PREDICTION_D,
+                a.MKT_PRIMARY_CONTACT
+            FROM UAT_MARKETING_WAREHOUSE.MARKETING_REPORTS.CONTACT_MATRIX a
+            JOIN UAT_MARKETING_WAREHOUSE.MARKETING_REPORTS.COMPANY_MATRIX c
+              ON a.SF_CONTACT_ACCOUNT_ID = c.COMPANY_ID
+            JOIN PROD_DATALAKE.SALESFORCE.CONTACT b
+              ON a.SF_CONTACTID = b.ID
+            WHERE c.MKT_RELEVANT = '0'
+              AND NVL(TO_VARCHAR(a.MKT_EMAIL),'') <> NVL(b.MKT_EMAIL__C,'')
+        )
+    `;
+    snowflake.execute({ sqlText: insert_stg_sql });
+
+    snowflake.execute({ sqlText: `SELECT 'STEP 2 COMPLETE: STG loaded with PROCESS_FLAG = N'` });
+
+    /*  PROCESS EACH BATCH (N → P → C / E)**/
+    var batch_rs = snowflake.execute({
+        sqlText: `
+            SELECT DISTINCT BATCH_ID
+            FROM UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+            WHERE PROCESS_FLAG = 'N'
+            ORDER BY BATCH_ID
+        `
+    });
+
+    while (batch_rs.next()) {
+
+        var batchId = batch_rs.getColumnValue(1);
+
+        snowflake.execute({ sqlText: `SELECT 'STARTING BATCH ' || ${batchId}` });
+
+        // Mark batch as Processing
+        snowflake.execute({
+            sqlText: `
+                UPDATE UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+                SET PROCESS_FLAG = 'P'
+                WHERE BATCH_ID = ${batchId}
+                  AND PROCESS_FLAG = 'N'
+            `
+        });
+
+        try {
+            // Insert batch into final table
+            snowflake.execute({
+                sqlText: `
+                    INSERT INTO UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE
+                    SELECT
+                        UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_ID.NEXTVAL,
+                        SF_CONTACT_ACCOUNT_ID,
+                        SF_CONTACTID,
+                        MKT_EMAIL,
+                        MKT_TITLE,
+                        MKT_TITLE_HIERARCHY,
+                        MKT_MANAGEMENT_HIERARCHY,
+                        MKT_JOB_FUNCTION,
+                        MKT_DEPARTMENT,
+                        MKT_DECISION_TYPE,
+                        MKT_ENRICHMENT_ID_C,
+                        MKT_SEGMENTATION_A,
+                        MKT_SEGMENTATION_B,
+                        MKT_SEGMENTATION_C,
+                        MKT_SEGMENTATION_D,
+                        MKT_PREDICTION_A,
+                        MKT_PREDICTION_B,
+                        MKT_PREDICTION_C,
+                        MKT_PREDICTION_D,
+                        MKT_PRIMARY_CONTACT,
+                        CURRENT_TIMESTAMP(),
+                        'MARKETING_DEVELOPER'
+                    FROM UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+                    WHERE BATCH_ID = ${batchId}
+                      AND PROCESS_FLAG = 'P'
+                `
+            });
+
+            snowflake.execute({ sqlText: `SELECT 'BATCH ${batchId}: Insert completed'` });
+
+            // Downstream Salesforce update
+            snowflake.execute({
+                sqlText: `
+                    CALL UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.MARKETING_SALESFORCE_CONTACT_UPDATE()
+                `
+            });
+
+            snowflake.execute({ sqlText: `SELECT 'BATCH ${batchId}: Salesforce update completed'` });
+
+            // Throttle
+            snowflake.execute({ sqlText: `CALL SYSTEM$WAIT(120)` });
+
+            // Mark batch completed
+            snowflake.execute({
+                sqlText: `
+                    UPDATE UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+                    SET PROCESS_FLAG = 'C'
+                    WHERE BATCH_ID = ${batchId}
+                      AND PROCESS_FLAG = 'P'
+                `
+            });
+
+            snowflake.execute({ sqlText: `SELECT 'BATCH ${batchId}: COMPLETED'` });
+
+        } catch (batchErr) {
+
+            // Mark batch error
+            snowflake.execute({
+                sqlText: `
+                    UPDATE UAT_MARKETING_WAREHOUSE.DWNSTRM_SALESFORCE.SALESFORCE_CONTACT_DATA_UPDATE_STG
+                    SET PROCESS_FLAG = 'E'
+                    WHERE BATCH_ID = ${batchId}
+                      AND PROCESS_FLAG = 'P'
+                `
+            });
+
+            snowflake.execute({
+                sqlText: `SELECT 'BATCH ${batchId}: FAILED - ${batchErr.message}'`
+            });
+
+            throw batchErr;
+        }
+    }
+
+    /**********************************************************
+     * END
+     **********************************************************/
+    snowflake.execute({ sqlText: `SELECT 'END: Procedure completed successfully'` });
+
+    return 'SUCCESSFULLY COMPLETED WITH PROCESS_FLAG';
+
+} catch (err) {
+
+    snowflake.execute({
+        sqlText: `SELECT 'FATAL ERROR: ${err.message}'`
+    });
+
+    return 'ERROR: ' + err.message;
+}
+$$;
