@@ -1,0 +1,51 @@
+Create a curated Vulnerability Data Mart in Snowflake that consolidates and structures vulnerability findings data for analytics and remediation reporting. This mart will replace fragmented reporting based on individual source systems by providing a unified, analysis-ready view of vulnerability exposure across the organization.
+
+This epic focuses on data modeling and enablement only. Ingestion of raw vulnerability data into Snowflake is handled in a separate epic. Sample data will be used to begin modeling work in parallel with ingestion.
+
+Scope
+
+Design and build the Vulnerability Data Mart on top of ingested vulnerability data.
+
+Model vulnerability findings across multiple source platforms into a consistent structure.
+
+Create curated tables/views suitable for BI and remediation team analysis.
+
+Support downstream consumption through semantic layers and reporting tools.
+
+Use sample data to accelerate modeling and validation prior to full ingestion availability.
+
+Technical Details 
+
+Design a vulnerability data model that unifies findings from multiple tools.
+
+Normalize identifiers and attributes (e.g., asset, vulnerability, source, severity, status).
+
+Create curated Snowflake tables/views representing vulnerability exposure.
+
+Enable semantic-layer concepts needed for BI and remediation reporting.
+
+Ingestion logic, pipelines, and source-system extraction are explicitly out of scope for this epic.
+
+Dependencies
+
+Availability of sample vulnerability data for modeling and validation.
+
+Completion of ingestion pipelines delivering vulnerability data to Snowflake.
+
+Alignment with Security / Legal / CISO stakeholders on required fields and sensitivity.
+
+Approval to use production-derived data for lower-environment development if needed.
+
+Deliverables
+
+Vulnerability Data Mart schema and tables in Snowflake.
+
+Curated, analytics-ready vulnerability datasets.
+
+Semantic-layer structures supporting BI and remediation use cases.
+
+Documentation of the data model, key fields, and intended usage.
+
+Sample Data
+
+  
