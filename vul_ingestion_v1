@@ -1,0 +1,32 @@
+CREATE OR REPLACE TABLE SECURITY_DM.RAW.ASSET_JSON_RAW (
+    file_name       STRING,
+    load_timestamp  TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
+    payload         VARIANT
+);
+
+
+COPY INTO SECURITY_DM.RAW.ASSET_JSON_RAW (file_name, payload)
+FROM (
+    SELECT
+        METADATA$FILENAME,
+        $1
+    FROM @SECURITY_DM.RAW.JSON_STAGE/asset-data-full.json
+)
+FILE_FORMAT = (TYPE = JSON);
+
+CREATE OR REPLACE TABLE SECURITY_DM.RAW.RAW_ASSET (
+    file_name       STRING,
+    load_timestamp  TIMESTAMP,
+    asset_id        STRING,
+    payload         VARIANT
+);
+
+
+INSERT INTO SECURITY_DM.RAW.RAW_ASSET
+SELECT
+    r.file_name,
+    r.load_timestamp,
+    a.value:asset_id::STRING AS asset_id,
+    a.value                  AS payload
+FROM SECURITY_DM.RAW.ASSET_JSON_RAW r,
+     LATERAL FLATTEN(input => r.payload:assets) a;
