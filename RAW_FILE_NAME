@@ -1,0 +1,11 @@
+JSON File	RAW Record Table
+asset-data-full	RAW_ASSET
+assetGroups-finding-data-full	RAW_ASSET_GROUP
+assets-finding-data-full	RAW_ASSET_FINDING
+findings-finding-data-full	RAW_FINDING
+instances-resolved	RAW_FINDING_INSTANCE
+justifications	RAW_JUSTIFICATION
+externalIssues	RAW_EXTERNAL_ISSUE
+compliance-findings	RAW_COMPLIANCE_FINDING
+compliance-instances	RAW_COMPLIANCE_INSTANCE
+------------------
