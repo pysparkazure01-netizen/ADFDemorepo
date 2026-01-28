@@ -170,6 +170,42 @@ FROM COMPLIANCE_INSTANCES_JSON_RAW r,
 
 
 
+DEV_ADS.PUBLIC.TEAMS_JSON_RAW
+(
+  FILE_NAME,
+  LOAD_TIMESTAMP,
+  PAYLOAD
+)
+CREATE OR REPLACE TABLE DEV_ADS.PUBLIC.RAW_FINDING_TEAM (
+    file_name                  STRING,
+    load_timestamp             TIMESTAMP,
+    findings_teams_id          STRING,
+    team_id                    STRING,
+    team_name                  STRING,
+    host_id                    STRING,
+    finding_number             STRING,
+    scan_type                  STRING,
+    finding_justification_key  STRING,
+    instance_key               STRING,
+    payload                    VARIANT
+);
+INSERT INTO DEV_ADS.PUBLIC.RAW_FINDING_TEAM
+SELECT
+    r.file_name,
+    r.load_timestamp,
+    t.value:findings_teams_id::STRING          AS findings_teams_id,
+    t.value:team_id::STRING                    AS team_id,
+    t.value:team_name::STRING                  AS team_name,
+    t.value:host_id::STRING                    AS host_id,
+    t.value:finding_number::STRING             AS finding_number,
+    t.value:scan_type::STRING                  AS scan_type,
+    t.value:finding_justification_key::STRING  AS finding_justification_key,
+    t.value:instance_key::STRING               AS instance_key,
+    t.value                                    AS payload
+FROM DEV_ADS.PUBLIC.TEAMS_JSON_RAW r,
+     LATERAL FLATTEN(
+         input => r.payload:teams
+     ) t;
 
 
 
