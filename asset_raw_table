@@ -1,0 +1,237 @@
+CREATE OR REPLACE TABLE RAW_ASSET (
+    file_name       STRING,
+    load_timestamp  TIMESTAMP,
+    asset_id        STRING,     -- natural identifier
+    payload         VARIANT
+);
+
+INSERT INTO RAW_ASSET
+SELECT
+    r.file_name,
+    r.load_timestamp,
+    a.value:asset_id::STRING AS asset_id,
+    a.value                  AS payload
+FROM ASSET_JSON_RAW r,
+     LATERAL FLATTEN(input => r.payload:assets) a;
+--------------------
+CREATE OR REPLACE TABLE RAW_ASSET_GROUP (
+    file_name       STRING,
+    load_timestamp  TIMESTAMP,
+    host_id         STRING,
+    asset_group_name STRING,
+    payload         VARIANT
+);
+INSERT INTO RAW_ASSET_GROUP
+SELECT
+    r.file_name,
+    r.load_timestamp,
+    g.value:host_id::STRING        AS host_id,
+    g.value:asset_group_name::STRING AS asset_group_name,
+    g.value                         AS payload
+FROM ASSET_GROUP_JSON_RAW r,
+     LATERAL FLATTEN(input => r.payload:assetGroups) g;
+----------------------------
+
+CREATE OR REPLACE TABLE RAW_ASSET_FINDING (
+    file_name       STRING,
+    load_timestamp  TIMESTAMP,
+    host_id         STRING,
+    payload         VARIANT
+);
+
+INSERT INTO RAW_ASSET_FINDING
+SELECT
+    r.file_name,
+    r.load_timestamp,
+    a.value:host_id::STRING AS host_id,
+    a.value                 AS payload
+FROM ASSETS_FINDING_JSON_RAW r,
+     LATERAL FLATTEN(input => r.payload:assets) a;
+
+------------------------------
+CREATE OR REPLACE TABLE RAW_TEAM (
+    file_name       STRING,
+    load_timestamp  TIMESTAMP,
+    team_id         STRING,
+    payload         VARIANT
+);
+INSERT INTO RAW_TEAM
+SELECT
+    r.file_name,
+    r.load_timestamp,
+    t.value:team_id::STRING AS team_id,
+    t.value                 AS payload
+FROM TEAMS_JSON_RAW r,
+     LATERAL FLATTEN(input => r.payload:teams) t;
+---------------------------------
+
+CREATE OR REPLACE TABLE RAW_FINDING (
+    file_name       STRING,
+    load_timestamp  TIMESTAMP,
+    finding_key     STRING,
+    payload         VARIANT
+);
+INSERT INTO RAW_FINDING
+SELECT
+    r.file_name,
+    r.load_timestamp,
+    f.value:finding_key::STRING AS finding_key,
+    f.value                      AS payload
+FROM FINDINGS_JSON_RAW r,
+     LATERAL FLATTEN(input => r.payload:findings) f;
+------------------------
+CREATE OR REPLACE TABLE RAW_FINDING_INSTANCE (
+    file_name       STRING,
+    load_timestamp  TIMESTAMP,
+    instance_key    STRING,
+    finding_key     STRING,
+    payload         VARIANT
+);
+INSERT INTO RAW_FINDING_INSTANCE
+SELECT
+    r.file_name,
+    r.load_timestamp,
+    i.value:instance_key::STRING AS instance_key,
+    i.value:finding_key::STRING  AS finding_key,
+    i.value                      AS payload
+FROM INSTANCES_RESOLVED_JSON_RAW r,
+     LATERAL FLATTEN(input => r.payload:instances) i;
+
+---------------------------------------
+CREATE OR REPLACE TABLE RAW_JUSTIFICATION (
+    file_name       STRING,
+    load_timestamp  TIMESTAMP,
+    justification_key STRING,
+    finding_key     STRING,
+    payload         VARIANT
+);
+INSERT INTO RAW_JUSTIFICATION
+SELECT
+    r.file_name,
+    r.load_timestamp,
+    j.value:justification_key::STRING AS justification_key,
+    j.value:finding_key::STRING       AS finding_key,
+    j.value                            AS payload
+FROM JUSTIFICATIONS_JSON_RAW r,
+     LATERAL FLATTEN(input => r.payload:justifications) j;
+---------------------------------
+CREATE OR REPLACE TABLE RAW_EXTERNAL_ISSUE (
+    file_name       STRING,
+    load_timestamp  TIMESTAMP,
+    issue_key       STRING,
+    finding_key     STRING,
+    payload         VARIANT
+);
+
+INSERT INTO RAW_EXTERNAL_ISSUE
+SELECT
+    r.file_name,
+    r.load_timestamp,
+    e.value:issue_key::STRING   AS issue_key,
+    e.value:finding_key::STRING AS finding_key,
+    e.value                      AS payload
+FROM EXTERNAL_ISSUES_JSON_RAW r,
+     LATERAL FLATTEN(input => r.payload:externalIssues) e;
+----------------------------------------------------------
+CREATE OR REPLACE TABLE RAW_COMPLIANCE_FINDING (
+    file_name       STRING,
+    load_timestamp  TIMESTAMP,
+    finding_key     STRING,
+    payload         VARIANT
+);
+
+INSERT INTO RAW_COMPLIANCE_FINDING
+SELECT
+    r.file_name,
+    r.load_timestamp,
+    c.value:finding_key::STRING AS finding_key,
+    c.value                      AS payload
+FROM COMPLIANCE_FINDINGS_JSON_RAW r,
+     LATERAL FLATTEN(input => r.payload:findings) c;
+-------------------------------------------------------------
+CREATE OR REPLACE TABLE RAW_COMPLIANCE_INSTANCE (
+    file_name       STRING,
+    load_timestamp  TIMESTAMP,
+    instance_key    STRING,
+    finding_key     STRING,
+    payload         VARIANT
+);
+INSERT INTO RAW_COMPLIANCE_INSTANCE
+SELECT
+    r.file_name,
+    r.load_timestamp,
+    i.value:instance_key::STRING AS instance_key,
+    i.value:finding_key::STRING  AS finding_key,
+    i.value                      AS payload
+FROM COMPLIANCE_INSTANCES_JSON_RAW r,
+     LATERAL FLATTEN(input => r.payload:instances) i;
+
+--------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
