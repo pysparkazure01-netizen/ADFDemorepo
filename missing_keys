@@ -1,0 +1,11 @@
+INSERT INTO DEV_ADS.PUBLIC.RAW_JUSTIFICATION
+SELECT
+    r.file_name,
+    r.load_timestamp,
+    j.value:finding_justification_key::STRING  AS justification_key,
+    j.value:finding_key::STRING                AS finding_key,  -- may still be null (see note)
+    j.value                                    AS payload
+FROM DEV_ADS.PUBLIC.JUSTIFICATIONS_JSON_RAW r,
+     LATERAL FLATTEN(
+         input => r.payload:justifications
+     ) j;
