@@ -1,0 +1,154 @@
+CREATE OR REPLACE TABLE DEV_ADS.PUBLIC.RAW_ASSET_WIDE (
+    file_name                       STRING,
+    load_timestamp                  TIMESTAMP,
+
+    -- Identity
+    asset_id                        STRING,
+    asset_name                      STRING,
+    asset_type                      STRING,
+
+    -- Names / IPs
+    asset_name_secondary            VARIANT,
+    ip_address                      STRING,
+    ip_address_secondary            VARIANT,
+    asset_groups                    VARIANT,
+
+    -- Scan & OS
+    scan_date                       STRING,
+    scan_date_timestamp             NUMBER,
+    operating_system_name           STRING,
+    operating_system_version        STRING,
+    operating_system_features       STRING,
+
+    -- Network / hardware
+    mac_address                     STRING,
+
+    -- Finding counts
+    finding_count_critical           NUMBER,
+    finding_count_high               NUMBER,
+    finding_count_medium             NUMBER,
+    finding_count_low                NUMBER,
+    finding_count_informational      NUMBER,
+    finding_count_pass               NUMBER,
+    finding_count_fail               NUMBER,
+    finding_vulnerability_score      NUMBER,
+
+    -- Risk / criticality
+    asset_base_risk_score            NUMBER,
+    asset_public                     BOOLEAN,
+    asset_criticality                STRING,
+    asset_data_sensitivity_score     NUMBER,
+    asset_complianced_score          NUMBER,
+    asset_criticality_score          NUMBER,
+
+    -- Image / container
+    image_config                     STRING,
+    image_config_digest              STRING,
+    image_manifest                   STRING,
+    image_manifest_digest            STRING,
+    image_secondary_registries        VARIANT,
+    image_tags                       VARIANT,
+    image_registry                   STRING,
+    image_repo                       STRING,
+    image_distro                     STRING,
+    image_platform_os                STRING,
+    image_platform_os_features       VARIANT,
+    image_platform_os_version        STRING,
+    image_platform_arch              STRING,
+    image_platform_arch_features     VARIANT,
+    image_platform_arch_variant      STRING,
+
+    -- Status / ownership
+    active                           BOOLEAN,
+    business_owners                  VARIANT,
+    owner_team                       VARIANT,
+    support_team                     VARIANT,
+
+    -- Dev metadata
+    branch                           STRING,
+    repo_url                         STRING,
+
+    -- Large nested object
+    asset_info                       VARIANT,
+
+    -- Safety net
+    full_payload                     VARIANT
+);
+INSERT INTO DEV_ADS.PUBLIC.RAW_ASSET_WIDE
+SELECT
+    r.file_name,
+    r.load_timestamp,
+
+    -- Identity
+    a.value:asset_id::STRING,
+    a.value:asset_name::STRING,
+    a.value:asset_type::STRING,
+
+    -- Names / IPs
+    a.value:asset_name_secondary,
+    a.value:ip_address::STRING,
+    a.value:ip_address_secondary,
+    a.value:asset_groups,
+
+    -- Scan & OS
+    a.value:scan_date::STRING,
+    a.value:scan_date_timestamp::NUMBER,
+    a.value:operating_system_name::STRING,
+    a.value:operating_system_version::STRING,
+    a.value:operating_system_features::STRING,
+
+    -- Network / hardware
+    a.value:mac_address::STRING,
+
+    -- Finding counts
+    a.value:finding_count_critical::NUMBER,
+    a.value:finding_count_high::NUMBER,
+    a.value:finding_count_medium::NUMBER,
+    a.value:finding_count_low::NUMBER,
+    a.value:finding_count_informational::NUMBER,
+    a.value:finding_count_pass::NUMBER,
+    a.value:finding_count_fail::NUMBER,
+    a.value:finding_vulnerability_score::NUMBER,
+
+    -- Risk / criticality
+    a.value:asset_base_risk_score::NUMBER,
+    a.value:asset_public::BOOLEAN,
+    a.value:asset_criticality::STRING,
+    a.value:asset_data_sensitivity_score::NUMBER,
+    a.value:asset_complianced_score::NUMBER,
+    a.value:asset_criticality_score::NUMBER,
+
+    -- Image / container
+    a.value:image_config::STRING,
+    a.value:image_config_digest::STRING,
+    a.value:image_manifest::STRING,
+    a.value:image_manifest_digest::STRING,
+    a.value:image_secondary_registries,
+    a.value:image_tags,
+    a.value:image_registry::STRING,
+    a.value:image_repo::STRING,
+    a.value:image_distro::STRING,
+    a.value:image_platform_os::STRING,
+    a.value:image_platform_os_features,
+    a.value:image_platform_os_version::STRING,
+    a.value:image_platform_arch::STRING,
+    a.value:image_platform_arch_features,
+    a.value:image_platform_arch_variant::STRING,
+
+    -- Status / ownership
+    a.value:active::BOOLEAN,
+    a.value:business_owners,
+    a.value:owner_team,
+    a.value:support_team,
+
+    -- Dev metadata
+    a.value:branch::STRING,
+    a.value:repo_url::STRING,
+
+    -- Nested object
+    a.value:asset_info,
+
+    -- Full payload
+    a.value
+FROM DEV_ADS.PUBLIC.ASSET_JSON_RAW r,
+     LATERAL FLATTEN(input => r.payload:assets) a;
