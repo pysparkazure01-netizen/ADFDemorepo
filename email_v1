@@ -1,0 +1,221 @@
+import smtplib
+import os
+import io
+import csv
+import re
+import sys
+import traceback
+from email.message import EmailMessage
+from email.utils import formatdate
+from datetime import datetime
+
+# ------------------------------------------------------------------
+# CONFIG
+# ------------------------------------------------------------------
+frm = "EdwMatillionJobs@mckesson.com"
+
+SMTP_HOST = os.environ.get("SMTP_HOST", "localhost")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "25"))
+SMTP_USE_TLS = os.environ.get("SMTP_USE_TLS", "false").lower() in ("1", "true", "yes")
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
+
+SAVE_EML_COPY = False
+ATTACH_CSV_IF_EMPTY = True
+
+# ------------------------------------------------------------------
+# HELPERS
+# ------------------------------------------------------------------
+def split_emails(s):
+    if not s:
+        return []
+    parts = re.split(r"[;,]", str(s))
+    return [x.strip() for x in parts if x.strip()]
+
+def dedupe_emails(addresses):
+    seen, out = set(), []
+    for a in addresses or []:
+        k = a.lower()
+        if k not in seen:
+            seen.add(k)
+            out.append(a)
+    return out
+
+def log_info(msg):
+    print(f"[INFO] {msg}")
+
+def log_err(msg):
+    print(f"[ERROR] {msg}", file=sys.stderr)
+
+def coerce_value(v):
+    return "" if v is None else str(v).strip()
+
+# ------------------------------------------------------------------
+# INPUTS FROM MATILLION
+# ------------------------------------------------------------------
+to = split_emails(jv_EMAIL_LIST)
+cc = split_emails(jv_CC_LIST)
+
+try:
+    bcc = split_emails(jv_BCC_LIST)
+except NameError:
+    bcc = []
+
+base_subject = (jv_SUBJECT or "").strip() or "Missing XREFs Report"
+intro_message = (jv_MESSAGE or "").strip()
+
+header = ["TABLE", "DATE", "RECORD_COUNT", "AMOUNT"]
+num_cols = len(header)
+
+# ------------------------------------------------------------------
+# FETCH GRID
+# ------------------------------------------------------------------
+array = context.getGridVariable("GV_PHD_MAIL")
+rows = []   # ALWAYS INITIALIZE
+
+log_info(f"GV_PHD_MAIL type: {type(array)}")
+
+# ------------------------------------------------------------------
+# NORMALIZE GRID DATA
+# ------------------------------------------------------------------
+try:
+    if not array:
+        rows = []
+
+    elif isinstance(array, (list, tuple)):
+
+        if isinstance(array[0], dict):
+            for d in array:
+                rows.append([coerce_value(d.get(col, "")) for col in header])
+
+        elif isinstance(array[0], (list, tuple)):
+            for line in array:
+                rows.append([coerce_value(c) for c in line])
+
+        else:
+            for line in array:
+                for r in csv.reader([str(line)]):
+                    rows.append([coerce_value(c) for c in r])
+
+    elif isinstance(array, str):
+        for r in csv.reader(array.splitlines()):
+            rows.append([coerce_value(c) for c in r])
+
+except Exception as e:
+    log_err(f"Normalization failed: {e}")
+    traceback.print_exc()
+    rows = []
+
+# ------------------------------------------------------------------
+# FIX COLUMN COUNT & DROP HEADER DUPLICATION
+# ------------------------------------------------------------------
+rows = [
+    list(r[:num_cols]) + [""] * max(0, num_cols - len(r))
+    for r in rows
+]
+
+if rows and all(a.strip() == b.strip() for a, b in zip(rows[0], header)):
+    log_info("Dropped duplicate header row")
+    rows = rows[1:]
+
+row_count = len(rows)
+log_info(f"Final row count: {row_count}")
+
+# ------------------------------------------------------------------
+# BUILD EMAIL
+# ------------------------------------------------------------------
+today_str = datetime.now().strftime("%d-%b-%Y")
+
+subject = (
+    f"{base_subject} – No missing XREFs"
+    if row_count == 0
+    else f"{base_subject} – {row_count} missing XREF(s) found"
+)
+
+msg = EmailMessage()
+msg["From"] = frm
+if to:
+    msg["To"] = ", ".join(to)
+if cc:
+    msg["Cc"] = ", ".join(cc)
+
+msg["Date"] = formatdate(localtime=True)
+msg["Subject"] = subject
+
+body = (
+    f"PHD Output Today ({today_str})\n\n"
+    + (intro_message + "\n\n" if intro_message else "")
+    + f"Record count: {row_count}\n\n"
+    + (
+        "No missing XREFs were found."
+        if row_count == 0
+        else "Please see the attached CSV for details."
+    )
+    + "\n\n"
+    + "Thanks and Regards,\n"
+    + "ETL Team"
+)
+
+msg.set_content(body)
+
+# ------------------------------------------------------------------
+# CSV ATTACHMENT
+# ------------------------------------------------------------------
+if ATTACH_CSV_IF_EMPTY or row_count > 0:
+    csv_buffer = io.StringIO(newline="")
+    writer = csv.writer(csv_buffer)
+
+    writer.writerow(header)
+    for r in rows:
+        writer.writerow(r)
+
+    csv_bytes = csv_buffer.getvalue().encode("utf-8-sig")
+    csv_buffer.close()
+
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = (
+        f"no_missing_xrefs_{ts}.csv"
+        if row_count == 0
+        else f"{row_count}_missing_xrefs_{ts}.csv"
+    )
+
+    msg.add_attachment(
+        csv_bytes,
+        maintype="text",
+        subtype="csv",
+        filename=filename
+    )
+
+# ------------------------------------------------------------------
+# SEND EMAIL
+# ------------------------------------------------------------------
+rcpt = dedupe_emails((to or []) + (cc or []) + (bcc or []))
+
+if not rcpt:
+    log_err("No recipients provided. Email not sent.")
+else:
+    server = None
+    try:
+        log_info(f"Connecting to SMTP {SMTP_HOST}:{SMTP_PORT}")
+        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30)
+        server.set_debuglevel(1)
+
+        if SMTP_USE_TLS:
+            server.starttls()
+
+        if SMTP_USER and SMTP_PASS:
+            server.login(SMTP_USER, SMTP_PASS)
+
+        server.send_message(msg, from_addr=frm, to_addrs=rcpt)
+        log_info("Email sent successfully")
+
+    except Exception:
+        log_err("SMTP send failed")
+        traceback.print_exc()
+
+    finally:
+        try:
+            if server:
+                server.quit()
+        except Exception:
+            pass
