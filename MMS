@@ -1,0 +1,1 @@
+jdbc:as400://MMS-339/MCKPRD;naming=system;libraries=DCJDE
