@@ -1,0 +1,11 @@
+Quick Query to Get All Combinations Needed for the Rebuild
+sqlSELECT DISTINCT
+    MAPS_MKT    AS CUST_SGMNT_MKT_DSC,
+    MAPS_STNG   AS CUST_SGMNT_SETTNG_DSC,
+    MAPS_TYPE   AS CUST_SGMNT_DFLT_TYPE_DSC,
+    COUNT(*)    AS CUST_COUNT,
+    NULL        AS LOYAL_CTGRY_LIMIT  -- business team to fill this in
+FROM DEV_ENT_DL_US_MMS_MISC_DB.MMSDW.V_MDM_CUST_SEGMENT
+GROUP BY 1,2,3
+ORDER BY 1,2,3;
+Export this to Excel, share with the business team to assign LOYAL_CTGRY_LIMIT values, then reload CHURN_SITE_LOYAL_CTGRY_CW with those values — and LIFECYCLE_FLAG = 'LOYAL' will start populating correctly again.
