@@ -1,0 +1,564 @@
+CUST_SGMNT_MKT_DSC	CUST_SGMNT_SETTNG_DSC	CUST_SGMNT_DFLT_TYPE_DSC	LOYAL_CTGRY_LIMIT
+Acute	Center - Cancer	Oncology	34.79
+Acute	Free Standing ER	Critical Care	34.35
+Acute	Hospital	Acute Care - General	20.41
+Acute	Hospital	Cardiology	8.54
+Acute	Hospital	Critical Care Access	19.97
+Acute	Hospital	DME/HME Supplies & Equipment	20.23
+Acute	Hospital	Dialysis/Nephrology	20.23
+Acute	Hospital	Eye and Ear	20.23
+Acute	Hospital	General/Family and Preventive Medicine	20.23
+Acute	Hospital	Hospitalist	20.23
+Acute	Hospital	Long-Term Acute Care	26.32
+Acute	Hospital	Military	5.6
+Acute	Hospital	Multi Specialty	20.23
+Acute	Hospital	Nursing Home - Skilled Care	20.23
+Acute	Hospital	Oncology	20.23
+Acute	Hospital	Ophthalmology	20.23
+Acute	Hospital	Orthopedics	14.28
+Acute	Hospital	Pathology - Hospital	14.13
+Acute	Hospital	Pediatrics	15.69
+Acute	Hospital	Pharmacy - Hospital	20.23
+Acute	Hospital	Physical Medicine/Rehab	21.04
+Acute	Hospital	Surgical	26.92
+Acute	Hospital	University/Teaching	31.5
+Acute	Hospital	Urgent Care	20.23
+Acute	Hospital	Veteran's Administration	13.25
+Acute	Hospital		15.48
+Ambulatory	Ambulance/Mobile Unit	Emergency Medical Services	21.52
+Ambulatory	Center - Addiction	Addiction Medicine	8.8
+Ambulatory	Center - Addiction	Medi-Spa	8.8
+Ambulatory	Center - Addiction	Pathology - Hospital	8.8
+Ambulatory	Center - Addiction	Psychiatry/Psychology	8.8
+Ambulatory	Center - Addiction		8.8
+Ambulatory	Center - Cancer	Acute Care - General	22.35
+Ambulatory	Center - Cancer	Cancer Treatment	22.67
+Ambulatory	Center - Cancer	Cardiology	22.35
+Ambulatory	Center - Cancer	General/Family and Preventive Medicine	22.35
+Ambulatory	Center - Cancer	Gynecologic Oncology	22.35
+Ambulatory	Center - Cancer	Infusion Therapy	22.35
+Ambulatory	Center - Cancer	Oncology	22.35
+Ambulatory	Center - Cancer	Oncology/Hematology	18.76
+Ambulatory	Center - Cancer	Ophthalmology	22.35
+Ambulatory	Center - Cancer	Physical Medicine/Rehab	22.35
+Ambulatory	Center - Cancer	Physician Office Lab	22.35
+Ambulatory	Center - Cancer	Radiation Oncology	21.91
+Ambulatory	Center - Cancer	Radiology/Imaging	22.35
+Ambulatory	Center - Chiropractic	Chiropractic Care	10.76
+Ambulatory	Center - Chiropractic		10.68
+Ambulatory	Center - Dialysis	Dialysis/Nephrology	16.93
+Ambulatory	Center - Dialysis	Endocrinology, Diabetes and Metabolism	16.92
+Ambulatory	Center - Dialysis	General/Family and Preventive Medicine	16.92
+Ambulatory	Center - Dialysis	Infusion Therapy	16.92
+Ambulatory	Center - Dialysis	Multi Specialty	16.92
+Ambulatory	Center - Dialysis	Nephrology	16.92
+Ambulatory	Center - Dialysis		16.92
+Ambulatory	Center - Eye	General/Family and Preventive Medicine	9.39
+Ambulatory	Center - Eye	Optometry	9.19
+Ambulatory	Center - Eye		9.39
+Ambulatory	Center - Imaging	Acute Care - General	18.47
+Ambulatory	Center - Imaging	General/Family and Preventive Medicine	18.47
+Ambulatory	Center - Imaging	Infusion Therapy	18.47
+Ambulatory	Center - Imaging	Multi Specialty	18.47
+Ambulatory	Center - Imaging	Neuroradiology	18.47
+Ambulatory	Center - Imaging	Neurosurgery	18.47
+Ambulatory	Center - Imaging	Nuclear Medicine	9.14
+Ambulatory	Center - Imaging	Oncology/Hematology	18.47
+Ambulatory	Center - Imaging	Orthopedic Surgery	18.47
+Ambulatory	Center - Imaging	Orthopedics	18.47
+Ambulatory	Center - Imaging	Pediatric Radiology	18.47
+Ambulatory	Center - Imaging	Radiology/Imaging	18.51
+Ambulatory	Center - Imaging	Vascular and Interventional Radiology	20.69
+Ambulatory	Center - Imaging	Workplace Health	18.47
+Ambulatory	Center - Imaging		18.47
+Ambulatory	Center - Infusion	Infusion Pharmacy	15.16
+Ambulatory	Center - Infusion	Infusion Therapy	15.17
+Ambulatory	Center - Infusion		15.16
+Ambulatory	Center - Mental Health	Behavioral Health	10.62
+Ambulatory	Center - Mental Health	Mental Health	10.64
+Ambulatory	Center - Rehabilitation	--	16.82
+Ambulatory	Center - Rehabilitation	Acute Care - General	16.82
+Ambulatory	Center - Rehabilitation	Pain Management	16.82
+Ambulatory	Center - Rehabilitation	Physical Medicine/Rehab	16.85
+Ambulatory	Center - Rehabilitation		16.82
+Ambulatory	Center - Sleep	Sleep Disorder Medicine	9.46
+Ambulatory	Center - Sleep		9.43
+Ambulatory	Center - Urgent Care	Acute Care - General	24.89
+Ambulatory	Center - Urgent Care	Distributor - Med/Surg Supplies	24.89
+Ambulatory	Center - Urgent Care	General/Family and Preventive Medicine	24.89
+Ambulatory	Center - Urgent Care	Multi Specialty	24.89
+Ambulatory	Center - Urgent Care	Office Supplies	24.89
+Ambulatory	Center - Urgent Care	Oncology/Hematology	24.89
+Ambulatory	Center - Urgent Care	Pediatrics	24.89
+Ambulatory	Center - Urgent Care	Physical Medicine/Rehab	24.89
+Ambulatory	Center - Urgent Care	Radiology/Imaging	24.89
+Ambulatory	Center - Urgent Care	Rheumatology	24.89
+Ambulatory	Center - Urgent Care	Urgent Care	24.91
+Ambulatory	Center - Urgent Care	Workplace Health	24.89
+Ambulatory	Center - Urgent Care		20.69
+Ambulatory	Clinic - Cosmetic	Alternative and Holistic Care	12.07
+Ambulatory	Clinic - Cosmetic	Dermatology	13
+Ambulatory	Clinic - Cosmetic	Endocrinology, Diabetes and Metabolism	12.07
+Ambulatory	Clinic - Cosmetic	General Surgery	12.07
+Ambulatory	Clinic - Cosmetic	General/Family and Preventive Medicine	12.07
+Ambulatory	Clinic - Cosmetic	Medi-Spa	11.58
+Ambulatory	Clinic - Cosmetic	Multi Specialty	12.07
+Ambulatory	Clinic - Cosmetic	Obstetrics and Gynecology	12.07
+Ambulatory	Clinic - Cosmetic	Personal Residence	12.07
+Ambulatory	Clinic - Cosmetic	Salon or Spa - General	12.07
+Ambulatory	Clinic - Cosmetic	Vascular Surgery	12.07
+Ambulatory	Clinic - Cosmetic	Vein Clinic	17.02
+Ambulatory	Clinic - Cosmetic		12.07
+Ambulatory	Clinic - Donation	Donor Services	18.55
+Ambulatory	Clinic - Donation		18.54
+Ambulatory	Clinic - Pain	Anesthesiology	16.59
+Ambulatory	Clinic - Pain	Cardiac Surgery	16.59
+Ambulatory	Clinic - Pain	Chiropractic Care	16.59
+Ambulatory	Clinic - Pain	General Surgery	16.59
+Ambulatory	Clinic - Pain	Orthopedic Surgery	16.59
+Ambulatory	Clinic - Pain	Pain Management	16.59
+Ambulatory	Clinic - Pain	Pain Medicine - Neurology	16.59
+Ambulatory	Clinic - Pain	Physical Medicine/Rehab	16.59
+Ambulatory	Clinic - Pain	Urgent Care	16.59
+Ambulatory	Clinic - Pain		13.53
+Ambulatory	Clinic - Retail	General/Family and Preventive Medicine	17.63
+Ambulatory	Clinic - Retail		4.43
+Ambulatory	Clinic - School	Academic or Custodial Department	23.25
+Ambulatory	Clinic - School	General/Family and Preventive Medicine	28.17
+Ambulatory	Clinic - School	Student Health	22.37
+Ambulatory	Clinic - School		23.25
+Ambulatory	Clinic - Workplace	Aerospace Medicine	12.25
+Ambulatory	Clinic - Workplace	Construction	12.25
+Ambulatory	Clinic - Workplace	Dialysis/Nephrology	12.25
+Ambulatory	Clinic - Workplace	General/Family and Preventive Medicine	12.25
+Ambulatory	Clinic - Workplace	Navy Fleet	12.25
+Ambulatory	Clinic - Workplace	Physical Medicine/Rehab	12.25
+Ambulatory	Clinic - Workplace	Physician Office Lab	12.25
+Ambulatory	Clinic - Workplace	Safety/Custodial	12.25
+Ambulatory	Clinic - Workplace	Urgent Care	22.51
+Ambulatory	Clinic - Workplace	Workplace Health	12.19
+Ambulatory	Clinic - Workplace		12.25
+Ambulatory	Clinic - Wound Care	Wound Care	19.46
+Ambulatory	Clinic - Wound Care		19.42
+Ambulatory	Clinic- Corrections	General/Family and Preventive Medicine	16.5
+Ambulatory	Clinic- Corrections	Jail/Detention/Prison - Adult	16.5
+Ambulatory	Clinic- Nutrition/Weight Management	General/Family and Preventive Medicine	14.57
+Ambulatory	Clinic- Nutrition/Weight Management	Multi Specialty	14.57
+Ambulatory	Clinic- Nutrition/Weight Management	Nutrition/Weight Management	14.57
+Ambulatory	Clinic- Nutrition/Weight Management		14.57
+Ambulatory	Dental Office	Academic or Custodial Department	12.48
+Ambulatory	Dental Office	Dentistry	12.51
+Ambulatory	Dental Office	General Surgery	12.48
+Ambulatory	Dental Office	General/Family and Preventive Medicine	12.48
+Ambulatory	Dental Office	Home Health Agency	12.48
+Ambulatory	Dental Office	Oral and Maxillofacial Medicine	12.2
+Ambulatory	Dental Office	Orthodontics	12.48
+Ambulatory	Dental Office	Other Dental Specialists	12.48
+Ambulatory	Dental Office	Pain Management	12.48
+Ambulatory	Dental Office	Pediatric Dentistry	12.48
+Ambulatory	Dental Office		12.48
+Ambulatory	Draw Stations/Mobile Unit	Blood Banking	5.95
+Ambulatory	Draw Stations/Mobile Unit	Distributor - Med/Surg Supplies	5.45
+Ambulatory	Draw Stations/Mobile Unit	Donor Services	0.8
+Ambulatory	Draw Stations/Mobile Unit	Pharmacy - Outpatient	5.45
+Ambulatory	Organ Transport/Storage	Organ/Eye/Tissue	15.75
+Ambulatory	Physician Office	--	31.44
+Ambulatory	Physician Office	Academic or Custodial Department	20.53
+Ambulatory	Physician Office	Acute Care - General	18.52
+Ambulatory	Physician Office	Addiction Rehabilitation	20.53
+Ambulatory	Physician Office	Adult Wellness/Fitness	20.53
+Ambulatory	Physician Office	Allergy and Immunology	16.68
+Ambulatory	Physician Office	Alternative and Holistic Care	11.22
+Ambulatory	Physician Office	Anesthesiology	17.68
+Ambulatory	Physician Office	Anticoagulation	20.53
+Ambulatory	Physician Office	Audiology/Otology	9.79
+Ambulatory	Physician Office	Bariatrics	7.55
+Ambulatory	Physician Office	Behavioral Health	14.86
+Ambulatory	Physician Office	Cancer Treatment	20.53
+Ambulatory	Physician Office	Cardiac Surgery	20.53
+Ambulatory	Physician Office	Cardiology	17.8
+Ambulatory	Physician Office	Chiropractic Care	20.53
+Ambulatory	Physician Office	Clinical Trials Multispecialty	9.88
+Ambulatory	Physician Office	Colon/Rectal Surgery	14.91
+Ambulatory	Physician Office	Continuing Care Retirement Communities	20.53
+Ambulatory	Physician Office	Critical Care	32.28
+Ambulatory	Physician Office	Critical Care Access	20.53
+Ambulatory	Physician Office	DME/HME Supplies & Equipment	20.53
+Ambulatory	Physician Office	Dentistry	20.53
+Ambulatory	Physician Office	Dermatology	19.17
+Ambulatory	Physician Office	Detention - Juvenile	20.53
+Ambulatory	Physician Office	Developmental and Behavioral Pediatrics	8.55
+Ambulatory	Physician Office	Emergency Medicine	28.9
+Ambulatory	Physician Office	Endocrinology, Diabetes and Metabolism	16.79
+Ambulatory	Physician Office	Forensic Psychiatry	20.53
+Ambulatory	Physician Office	Gastroenterology	18.71
+Ambulatory	Physician Office	Gen/Fam and Prev Medicine - Mobile	20.53
+Ambulatory	Physician Office	General Surgery	20.25
+Ambulatory	Physician Office	General/Family and Preventive Medicine	20.69
+Ambulatory	Physician Office	Genetics	13.11
+Ambulatory	Physician Office	Geriatric Medicine	18.38
+Ambulatory	Physician Office	Gynecologic Oncology	22.55
+Ambulatory	Physician Office	Hand Surgery	10.91
+Ambulatory	Physician Office	Head and Neck Surgery	20.53
+Ambulatory	Physician Office	Health Department	20.53
+Ambulatory	Physician Office	Hepatology	20.53
+Ambulatory	Physician Office	Home Health Agency	20.53
+Ambulatory	Physician Office	Hospice and Palliative Care	20.53
+Ambulatory	Physician Office	Hospitalist	20.53
+Ambulatory	Physician Office	Infectious Disease	13.5
+Ambulatory	Physician Office	Infusion Therapy	20.53
+Ambulatory	Physician Office	Internal Medicine	17.15
+Ambulatory	Physician Office	Legal Medicine	20.53
+Ambulatory	Physician Office	Licensed Clinical Social Work	20.53
+Ambulatory	Physician Office	Male Infertility	20.53
+Ambulatory	Physician Office	Maternal and Fetal Medicine	11.37
+Ambulatory	Physician Office	Medi-Spa	20.53
+Ambulatory	Physician Office	Medical School	20.53
+Ambulatory	Physician Office	Mental Health	20.53
+Ambulatory	Physician Office	Midwifery	8.05
+Ambulatory	Physician Office	Multi Specialty	28.49
+Ambulatory	Physician Office	Musculoskeletal Oncology	20.53
+Ambulatory	Physician Office	Neonatal and Perinatal Medicine	8.95
+Ambulatory	Physician Office	Nephrology	16.96
+Ambulatory	Physician Office	Neurodevelopmental Medicine	20.53
+Ambulatory	Physician Office	Neurology	16.75
+Ambulatory	Physician Office	Neurosurgery	20.43
+Ambulatory	Physician Office	Neurotology	20.53
+Ambulatory	Physician Office	Nursing School	20.53
+Ambulatory	Physician Office	Nutrition/Weight Management	20.53
+Ambulatory	Physician Office	Obstetrics and Gynecology	21.5
+Ambulatory	Physician Office	Occupational Therapy	15.62
+Ambulatory	Physician Office	Oncology/Hematology	19.93
+Ambulatory	Physician Office	Ophthalmology	17.83
+Ambulatory	Physician Office	Oral and Maxillofacial Medicine	20.53
+Ambulatory	Physician Office	Ortho Foot and Ankle	25.84
+Ambulatory	Physician Office	Ortho Hand	7.87
+Ambulatory	Physician Office	Orthopedic Surgery	17.12
+Ambulatory	Physician Office	Orthopedics	18.64
+Ambulatory	Physician Office	Osteopathic Medicine	6.66
+Ambulatory	Physician Office	Otolaryngology	16.86
+Ambulatory	Physician Office	Pain Management	20.53
+Ambulatory	Physician Office	Pain Medicine - Neurology	16.84
+Ambulatory	Physician Office	Pathology	8.69
+Ambulatory	Physician Office	Pathology - Central Lab	23.83
+Ambulatory	Physician Office	Pathology - Clinical	20.53
+Ambulatory	Physician Office	Pediatric Oncology	20.53
+Ambulatory	Physician Office	Pediatric Psychology/Psychiatry	20.53
+Ambulatory	Physician Office	Pediatrics	20.28
+Ambulatory	Physician Office	Physical Medicine/Rehab	20.53
+Ambulatory	Physician Office	Physician Office Lab	7.73
+Ambulatory	Physician Office	Plastic Surgery	23.46
+Ambulatory	Physician Office	Podiatry	12.76
+Ambulatory	Physician Office	Proctology	16.06
+Ambulatory	Physician Office	Prosthetics	20.53
+Ambulatory	Physician Office	Psychiatry/Psychology	14.81
+Ambulatory	Physician Office	Pulmonology	14.41
+Ambulatory	Physician Office	Radiation Oncology	22.68
+Ambulatory	Physician Office	Radiology/Imaging	20.53
+Ambulatory	Physician Office	Reproductive Endocrinology/Infertility	23.47
+Ambulatory	Physician Office	Rheumatology	15.38
+Ambulatory	Physician Office	Sleep Disorder Medicine	20.53
+Ambulatory	Physician Office	Spinal Cord Injury Medicine	18.72
+Ambulatory	Physician Office	Sports Medicine	14.29
+Ambulatory	Physician Office	Student Health	20.53
+Ambulatory	Physician Office	Surgical Oncology	20.53
+Ambulatory	Physician Office	Thoracic Cardiology	20.53
+Ambulatory	Physician Office	Thoracic Surgery	16.46
+Ambulatory	Physician Office	Transplant Surgery	20.53
+Ambulatory	Physician Office	Urgent Care	28.8
+Ambulatory	Physician Office	Urology	22.59
+Ambulatory	Physician Office	Vascular Surgery	21.36
+Ambulatory	Physician Office	Veterinary Medicine	20.53
+Ambulatory	Physician Office	Warehouse	20.53
+Ambulatory	Physician Office	Wellness/Flu/Immunizations	20.53
+Ambulatory	Physician Office	Women's Health and Wellness	19.53
+Ambulatory	Physician Office	Workplace Health	20.53
+Ambulatory	Physician Office		18.26
+Ambulatory	Surgery Center	--	27.29
+Ambulatory	Surgery Center	Acute Care - General	26.96
+Ambulatory	Surgery Center	Anesthesiology	15.19
+Ambulatory	Surgery Center	Bariatrics	9.93
+Ambulatory	Surgery Center	Cardiac Surgery	20.95
+Ambulatory	Surgery Center	Cardiology	26.96
+Ambulatory	Surgery Center	Colon/Rectal Surgery	8.15
+Ambulatory	Surgery Center	Dentistry	19.14
+Ambulatory	Surgery Center	Dermatology	20.28
+Ambulatory	Surgery Center	Endocrinology, Diabetes and Metabolism	26.96
+Ambulatory	Surgery Center	Gastroenterology	24.03
+Ambulatory	Surgery Center	General Surgery	28.8
+Ambulatory	Surgery Center	Gynecologic Oncology	26.96
+Ambulatory	Surgery Center	Hand Surgery	26.96
+Ambulatory	Surgery Center	Hand Surgery Plastic Surgery	26.96
+Ambulatory	Surgery Center	Internal Medicine	26.96
+Ambulatory	Surgery Center	Multi Specialty	24.52
+Ambulatory	Surgery Center	Neurosurgery	24.82
+Ambulatory	Surgery Center	Obstetrics and Gynecology	26.47
+Ambulatory	Surgery Center	Oncology/Hematology	26.96
+Ambulatory	Surgery Center	Ophthalmology	24.8
+Ambulatory	Surgery Center	Oral and Maxillofacial Medicine	17.82
+Ambulatory	Surgery Center	Organ/Eye/Tissue	13.28
+Ambulatory	Surgery Center	Orthopedic Surgery	26.61
+Ambulatory	Surgery Center	Orthopedics	28.39
+Ambulatory	Surgery Center	Otolaryngology	24.76
+Ambulatory	Surgery Center	Pain Management	22.78
+Ambulatory	Surgery Center	Pediatrics	26.96
+Ambulatory	Surgery Center	Physical Medicine/Rehab	20.15
+Ambulatory	Surgery Center	Plastic Surgery	28.18
+Ambulatory	Surgery Center	Podiatry	28.36
+Ambulatory	Surgery Center	Radiology/Imaging	26.96
+Ambulatory	Surgery Center	Reproductive Endocrinology/Infertility	26.77
+Ambulatory	Surgery Center	Sports Medicine	17.97
+Ambulatory	Surgery Center	Surgical Oncology	26.96
+Ambulatory	Surgery Center	Thoracic Surgery	26.96
+Ambulatory	Surgery Center	Transplant Surgery	26.96
+Ambulatory	Surgery Center	Trauma Surgery	26.96
+Ambulatory	Surgery Center	Urology	33.96
+Ambulatory	Surgery Center	Vascular Medicine	21.84
+Ambulatory	Surgery Center	Vascular Surgery	22.91
+Ambulatory	Surgery Center	Vein Clinic	26.96
+Ambulatory	Surgery Center	Workplace Health	26.96
+Ambulatory	Surgery Center		24.34
+Ambulatory	Travelling Clinic	Wellness/Flu/Immunizations	11.55
+Animal	Pet Care Facility	Pet Grooming	2.61
+Animal	Post Mortem Facility Animal	Taxidermy	0.8
+Animal	Veterinary Clinic	Distributor - Med/Surg Supplies	13.45
+Animal	Veterinary Clinic	Veterinary Lab	13.45
+Animal	Veterinary Clinic	Veterinary Medicine	13.48
+Animal	Veterinary Clinic	Veterinary Supply	13.45
+Animal	Veterinary Clinic		13.45
+Animal	Veterinary Hospital	Veterinary Medicine	22.26
+Animal	Zoo/Animal Shelter	Veterinary Medicine	1.6
+Continuing Care	Adult Day Services Center	Adult Day Care	23.69
+Continuing Care	Adult Day Services Center	Nursing Home - Skilled Care	23.45
+Continuing Care	Center - Dialysis	Dialysis/Nephrology	0.8
+Continuing Care	DME/HME	DME/HME Ecommerce Only	23.42
+Continuing Care	DME/HME	DME/HME Specialty Equipment	16.05
+Continuing Care	DME/HME	DME/HME Supplies & Equipment	23.15
+Continuing Care	DME/HME	DME/HME Supplies Only	17.22
+Continuing Care	DME/HME	Distributor - Med/Surg Supplies	23.42
+Continuing Care	DME/HME	Home Health Agency	23.42
+Continuing Care	DME/HME	Pharmacy - Mail Order	23.42
+Continuing Care	DME/HME	Pharmacy - Retail	23.42
+Continuing Care	DME/HME		30.6
+Continuing Care	Home Care	Academic or Custodial Department	19.48
+Continuing Care	Home Care	DME/HME Supplies & Equipment	13.83
+Continuing Care	Home Care	Home Dialysis	13.15
+Continuing Care	Home Care	Home Health Agency	20.84
+Continuing Care	Home Care	Home Hospice	23.69
+Continuing Care	Home Care	Infusion Pharmacy	15.74
+Continuing Care	Home Care	Life Assistance Services	19.48
+Continuing Care	Home Care	Nursing Home - Skilled Care	19.48
+Continuing Care	Home Care	Oncology/Hematology	19.48
+Continuing Care	Home Care	Personal Care Services	19.48
+Continuing Care	Home Care	Pharmacy - Closed LTC	19.48
+Continuing Care	Home Care	Pharmacy - Infusion	19.48
+Continuing Care	Home Care	Pharmacy - Mail Order	19.48
+Continuing Care	Home Care	Pharmacy - Retail	19.48
+Continuing Care	Home Care	Pharmacy - Specialty	19.48
+Continuing Care	Home Care		19.48
+Continuing Care	Residential Care	--	25.61
+Continuing Care	Residential Care	Acute Care - General	23.22
+Continuing Care	Residential Care	Addiction Rehabilitation	15.61
+Continuing Care	Residential Care	Alzheimers Care	11.26
+Continuing Care	Residential Care	Assisted Living	13.84
+Continuing Care	Residential Care	Behavioral Health	23.22
+Continuing Care	Residential Care	Board & Care	23.97
+Continuing Care	Residential Care	Continuing Care Retirement Communities	27.65
+Continuing Care	Residential Care	DME/HME Supplies & Equipment	23.22
+Continuing Care	Residential Care	Home Health Agency	23.22
+Continuing Care	Residential Care	Hospice - Inpatient	23.34
+Continuing Care	Residential Care	Independent Living	22.22
+Continuing Care	Residential Care	Long-Term Acute Care	23.22
+Continuing Care	Residential Care	Mental Disability	20.5
+Continuing Care	Residential Care	Nursing Home - Intermediate Care	23.8
+Continuing Care	Residential Care	Nursing Home - Skilled Care	24.47
+Continuing Care	Residential Care	Pediatric - Skilled Care	32.04
+Continuing Care	Residential Care	Physical Medicine/Rehab	25.03
+Continuing Care	Residential Care	Psychiatric	21.52
+Continuing Care	Residential Care	Veteran's Administration	23.07
+Continuing Care	Residential Care		23.22
+Lab	Lab - Clinical	Acute Care - General	11.13
+Lab	Lab - Clinical	Multi Specialty	11.13
+Lab	Lab - Clinical	Pathology - Clinical	10.6
+Lab	Lab - Clinical	Pathology - Reference	11.13
+Lab	Lab - Crime	Pathology - Forensic	12.19
+Lab	Lab - Reference	Pathology - Clinical	8.28
+Lab	Lab - Reference	Pathology - Reference	8.01
+Lab	Lab - Reference	Pathology - Research	8.28
+Lab	Lab - Reference		8.28
+Lab	Lab - Research	Academic or Custodial Department	11.61
+Lab	Lab - Research	Acute Care - General	11.61
+Lab	Lab - Research	General Surgery	11.61
+Lab	Lab - Research	General/Family and Preventive Medicine	11.61
+Lab	Lab - Research	Medical School	11.61
+Lab	Lab - Research	Pathology - Central Lab	9.8
+Lab	Lab - Research	Pathology - Research	18.87
+Lab	Lab - Research	Research Institute	11.61
+Lab	Lab - Research		11.61
+Lab	Lab - Specialty	Chemical Testing	7.06
+Lab	Lab - Specialty	Cytopathology	10.61
+Lab	Lab - Specialty	Dermatopathology	7.65
+Lab	Lab - Specialty	Medical Microbiology	5.55
+Lab	Lab - Specialty	Molecular Genetics	8.21
+Lab	Lab - Specialty	Neuropathology	8.39
+Non-Clinical	Business Office	Office Supplies	2.99
+Non-Clinical	Consumer Retail	Retail	7.21
+Non-Clinical	Consumer Retail	Retail Ecommerce Only	13.67
+Non-Clinical	Corrections Facility	Academic or Custodial Department	22.16
+Non-Clinical	Corrections Facility	Detention - Juvenile	10.39
+Non-Clinical	Corrections Facility	Fire/Rescue	22.16
+Non-Clinical	Corrections Facility	General/Family and Preventive Medicine	26.6
+Non-Clinical	Corrections Facility	Jail/Detention/Prison - Adult	22.15
+Non-Clinical	Corrections Facility	Law Enforcement Agency	22.16
+Non-Clinical	Day Care Facility	Pediatric Day Care	1.83
+Non-Clinical	Distributor	Acute Care - General	18.39
+Non-Clinical	Distributor	DME/HME Supplies & Equipment	18.39
+Non-Clinical	Distributor	Distributor - Government Only	10.38
+Non-Clinical	Distributor	Distributor - Lab Supplies	10.75
+Non-Clinical	Distributor	Distributor - Med/Surg Supplies	17.81
+Non-Clinical	Distributor	Donor Services	18.39
+Non-Clinical	Distributor	General/Family and Preventive Medicine	18.39
+Non-Clinical	Distributor	Jail/Detention/Prison - Adult	18.39
+Non-Clinical	Distributor	Pathology - Clinical	18.39
+Non-Clinical	Distributor	Pharmacy - Internet	18.39
+Non-Clinical	Distributor	Pharmacy - Retail	18.39
+Non-Clinical	Distributor	Professional Services	18.39
+Non-Clinical	Distributor	Regulatory/Bureau/Dept	18.39
+Non-Clinical	Distributor	Warehouse	18.39
+Non-Clinical	Distributor		18.39
+Non-Clinical	Educational Institution	Academic or Custodial Department	15.11
+Non-Clinical	Educational Institution	Acute Care - General	15.47
+Non-Clinical	Educational Institution	DME/HME Supplies & Equipment	15.47
+Non-Clinical	Educational Institution	Dental School	15.47
+Non-Clinical	Educational Institution	Gastroenterology	15.47
+Non-Clinical	Educational Institution	General/Family and Preventive Medicine	15.47
+Non-Clinical	Educational Institution	Infectious Disease	15.47
+Non-Clinical	Educational Institution	Internal Medicine	15.47
+Non-Clinical	Educational Institution	Maternal and Fetal Medicine	15.47
+Non-Clinical	Educational Institution	Medical School	14.45
+Non-Clinical	Educational Institution	Medical Technology and Services	15.47
+Non-Clinical	Educational Institution	Multi Specialty	15.47
+Non-Clinical	Educational Institution	Nursing School	12.91
+Non-Clinical	Educational Institution	Orthopedics	15.47
+Non-Clinical	Educational Institution	Osteopathic Medical School	13.46
+Non-Clinical	Educational Institution	Pathology - Central Lab	15.47
+Non-Clinical	Educational Institution	Pathology - Hospital	15.47
+Non-Clinical	Educational Institution	Radiology/Imaging	15.47
+Non-Clinical	Educational Institution	Rheumatology	15.47
+Non-Clinical	Educational Institution	Sports Medicine	15.47
+Non-Clinical	Educational Institution	Veterinary School	15.47
+Non-Clinical	Educational Institution		15.47
+Non-Clinical	Fire Station/Vehicle	Fire/Rescue	14.37
+Non-Clinical	Government Agency	Acute Care - General	6.13
+Non-Clinical	Government Agency	Bureau Indian Affairs	16.17
+Non-Clinical	Government Agency	Courts/Legal System	6.13
+Non-Clinical	Government Agency	DME/HME Supplies & Equipment	6.13
+Non-Clinical	Government Agency	Dentistry	6.13
+Non-Clinical	Government Agency	Dept of Defense	7.2
+Non-Clinical	Government Agency	General/Family and Preventive Medicine	6.13
+Non-Clinical	Government Agency	Government Sponsored Assistance	18.19
+Non-Clinical	Government Agency	Govt Subcontractors	18.5
+Non-Clinical	Government Agency	Health Department	7.68
+Non-Clinical	Government Agency	Homeland Security/USCG	4.43
+Non-Clinical	Government Agency	Jail/Detention/Prison - Adult	6.13
+Non-Clinical	Government Agency	Law Enforcement Agency	17.59
+Non-Clinical	Government Agency	Medical Examiner/Morgue	2.28
+Non-Clinical	Government Agency	Medical School	6.13
+Non-Clinical	Government Agency	Medical Toxicology	6.13
+Non-Clinical	Government Agency	Military	10.99
+Non-Clinical	Government Agency	Parks & Rec	6.13
+Non-Clinical	Government Agency	Pharmacy - Retail with DME	6.13
+Non-Clinical	Government Agency	Regulatory/Bureau/Dept	8.95
+Non-Clinical	Government Agency	Set Asides	25.38
+Non-Clinical	Government Agency	State/Executive Branch	7.76
+Non-Clinical	Government Agency	Warehouse	6.13
+Non-Clinical	Government Agency		6.13
+Non-Clinical	Home Care	Home Health Agency	8.83
+Non-Clinical	Industrial	Accomodation/Food Srvc	3
+Non-Clinical	Industrial	Adult Wellness/Fitness	7.73
+Non-Clinical	Industrial	Agriculture	12.96
+Non-Clinical	Industrial	Arts/Entertain/Recreation	1.86
+Non-Clinical	Industrial	Cannabis Dispensary	12.96
+Non-Clinical	Industrial	Construction	1.14
+Non-Clinical	Industrial	Finance/Insur/Real Estate	7.44
+Non-Clinical	Industrial	General/Family and Preventive Medicine	12.96
+Non-Clinical	Industrial	Mining/Natural Resources	12.96
+Non-Clinical	Industrial	Non-Medical Manufacturing	1.65
+Non-Clinical	Industrial	Other Supplier	12.96
+Non-Clinical	Industrial	Professional Services	18.45
+Non-Clinical	Industrial	Regulatory/Bureau/Dept	12.96
+Non-Clinical	Industrial	Safety/Custodial	12.71
+Non-Clinical	Industrial	Transp/Commun/Utilities	1.46
+Non-Clinical	Industrial	Youth Recreation/Fitness	2.56
+Non-Clinical	Liquidator	Liquidator	4.05
+Non-Clinical	McKesson	DME/HME Supplies & Equipment	30.86
+Non-Clinical	McKesson	Internal Transfers	30.73
+Non-Clinical	Personal Residence	Personal Residence	18.22
+Non-Clinical	Pharmacy	Critical Care Access	16.71
+Non-Clinical	Pharmacy	DME/HME Supplies & Equipment	16.71
+Non-Clinical	Pharmacy	Distributor - Med/Surg Supplies	16.71
+Non-Clinical	Pharmacy	Home Health Agency	16.71
+Non-Clinical	Pharmacy	Home Hospice	16.71
+Non-Clinical	Pharmacy	Infusion Pharmacy	16.71
+Non-Clinical	Pharmacy	Infusion Therapy	16.71
+Non-Clinical	Pharmacy	Nuclear Medicine	7.27
+Non-Clinical	Pharmacy	Pharmacy - Central Fill	16.71
+Non-Clinical	Pharmacy	Pharmacy - Closed	8.52
+Non-Clinical	Pharmacy	Pharmacy - Closed HMO	16.71
+Non-Clinical	Pharmacy	Pharmacy - Closed LTC	18.51
+Non-Clinical	Pharmacy	Pharmacy - Closed Union Shop	16.71
+Non-Clinical	Pharmacy	Pharmacy - Closed Wrkr Comp	16.71
+Non-Clinical	Pharmacy	Pharmacy - Compounding	8.81
+Non-Clinical	Pharmacy	Pharmacy - Hospital	16.71
+Non-Clinical	Pharmacy	Pharmacy - Infusion	16.71
+Non-Clinical	Pharmacy	Pharmacy - Mail Order	15.18
+Non-Clinical	Pharmacy	Pharmacy - Nuclear	24.71
+Non-Clinical	Pharmacy	Pharmacy - Outpatient	13.4
+Non-Clinical	Pharmacy	Pharmacy - Retail	13.15
+Non-Clinical	Pharmacy	Pharmacy - Retail in Clinic	16.71
+Non-Clinical	Pharmacy	Pharmacy - Retail in Grocery	1.79
+Non-Clinical	Pharmacy	Pharmacy - Retail in Hospital	16.71
+Non-Clinical	Pharmacy	Pharmacy - Retail in Nrs Hm	16.71
+Non-Clinical	Pharmacy	Pharmacy - Retail in School	16.71
+Non-Clinical	Pharmacy	Pharmacy - Retail with DME	20.67
+Non-Clinical	Pharmacy	Pharmacy - Specialty	15.23
+Non-Clinical	Pharmacy	Pharmacy Wholesaler	16.71
+Non-Clinical	Pharmacy	Vascular Surgery	16.71
+Non-Clinical	Pharmacy	Veteran's Administration	16.71
+Non-Clinical	Pharmacy		16.71
+Non-Clinical	Place of Worship	Safety/Custodial	10.6
+Non-Clinical	Post Mortem Facility	Mortuary/Funeral Home/Crematorium	1.9
+Non-Clinical	Research Facility	Acute Care - General	21.45
+Non-Clinical	Research Facility	Clinical Pharmacology	9.78
+Non-Clinical	Research Facility	Medical School	21.45
+Non-Clinical	Research Facility	Research Institute	33.59
+Non-Clinical	Research Facility	Undefined	21.45
+Non-Clinical	Research Facility		21.45
+Non-Clinical	Salons and Spas	Body Art	6.77
+Non-Clinical	Salons and Spas	Salon or Spa - General	6.51
+Non-Clinical	Shelter	Children/Teens	8.58
+Non-Clinical	Shelter	Homeless	8.58
+Non-Clinical	Shelter	Women	8.58
+Non-Clinical	Supplier	Distributor - Med/Surg Supplies	82.76
+Non-Clinical	Supplier	Hospital Warehouse	82.76
+Non-Clinical	Supplier	Manufacturer	7.89
+Non-Clinical	Supplier	Medical Manufacturing	3.5
+Non-Clinical	Supplier	Other Supplier	82.76
+Non-Clinical	Supplier	Sleep Disorder Medicine	82.76
+Non-Clinical	Supplier	Warehouse	44.92
+Non-Clinical	Supplier	Wholesaler	24.78
+Non-Clinical	Supplier		82.76
+Non-Clinical	Support Service Center	Addiction	1.86
+Non-Clinical	Support Service Center	Disabilities	4.7
+Non-Clinical	Support Service Center	Outreach/Missionary/Disaster	7.26
+Non-Clinical	Support Service Center	Pregnancy	2.67
+Undefined	Surgery Center	Multi Specialty	11.02
+Undefined	Undefined	Cardiology	12.95
+Undefined	Undefined	Clinical Trials Multispecialty	12.95
+Undefined	Undefined	DME/HME Supplies & Equipment	12.95
+Undefined	Undefined	DME/HME Supplies Only	12.95
+Undefined	Undefined	Distributor - Med/Surg Supplies	12.95
+Undefined	Undefined	Maternal and Fetal Medicine	12.95
+Undefined	Undefined	Professional Services	12.95
+Undefined	Undefined	Undefined	12.75
+Undefined	Undefined	Wholesaler	12.95
