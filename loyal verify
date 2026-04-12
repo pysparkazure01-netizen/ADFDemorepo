@@ -1,0 +1,21 @@
+sql-- 1. Verify LOYAL count is reasonable vs historical numbers
+SELECT 
+    LIFECYCLE_FLAG,
+    COUNT(*)                                    AS RECORD_COUNT,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) 
+          OVER(), 2)                            AS PCT_OF_TOTAL
+FROM DEV_ENT_DL_US_MMS_MISC_DB.HADOOP.M_CUST_CHURN_INDICATOR_ST_CW
+GROUP BY LIFECYCLE_FLAG
+ORDER BY RECORD_COUNT DESC;
+This Week
+sql-- 2. Compare LOYAL count month over month to ensure
+--    numbers are consistent and not spiking/dropping
+SELECT
+    MONTH_RUN,
+    COUNT(CASE WHEN LIFECYCLE_FLAG = 'LOYAL' THEN 1 END)  AS LOYAL_COUNT,
+    COUNT(CASE WHEN LIFECYCLE_FLAG = 'ACTIVE' THEN 1 END) AS ACTIVE_COUNT,
+    COUNT(CASE WHEN LIFECYCLE_FLAG = 'LOST' THEN 1 END)   AS LOST_COUNT,
+    COUNT(*)                                               AS TOTAL_COUNT
+FROM DEV_ENT_DL_US_MMS_MISC_DB.HADOOP.M_CUST_CHURN_INDICATOR_ST_CW
+GROUP BY MONTH_RUN
+ORDER BY MONTH_RUN DESC;
