@@ -1,0 +1,145 @@
+-- ============================================================
+-- STEP 1: Confirm LOYAL exists in M_CUST_CHURN_INDICATOR_ST_CW
+-- ============================================================
+SELECT
+    LIFECYCLE_FLAG,
+    COUNT(DISTINCT CUST_E1_NUM)                           AS DISTINCT_CUSTOMERS,
+    COUNT(DISTINCT MONTH_RUN)                             AS DISTINCT_MONTHS,
+    COUNT(*)                                              AS TOTAL_ROWS
+FROM DEV_ENT_DL_US_MMS_MISC_DB.HADOOP.M_CUST_CHURN_INDICATOR_ST_CW
+WHERE LGCY_PLTFRM = 'MMS'
+GROUP BY LIFECYCLE_FLAG
+ORDER BY TOTAL_ROWS DESC;
+-- EXPECTED: LOYAL should appear with customer count > 0
+
+
+-- ============================================================
+-- STEP 2: Check LOYAL_CNT in M_CHURN_ST_SUMMARY_CW
+-- Are LOYAL months being counted correctly?
+-- ============================================================
+SELECT
+    LOYAL_CNT,
+    MTH_CNT,
+    ACTIVE_CNT,
+    NEW_CNT,
+    LOST_CNT,
+    AT_RISK_CNT,
+    ACCT_STATUS,
+    LIFE_CYCLE,
+    COUNT(DISTINCT CUST_E1_NUM)                           AS CUSTOMER_COUNT
+FROM DEV_ENT_DL_US_MMS_MISC_DB.HADOOP.M_CHURN_ST_SUMMARY_CW
+WHERE LOYAL_CNT > 0   -- customers who HAD loyal months
+GROUP BY 1,2,3,4,5,6,7,8
+ORDER BY LOYAL_CNT DESC
+LIMIT 50;
+-- KEY CHECK: Are these getting LIFE_CYCLE = 'LOYAL' or falling to 'AT RISK'?
+
+
+-- ============================================================
+-- STEP 3: The core mismatch — why LOYAL_CNT > 0 but LIFE_CYCLE != 'LOYAL'
+-- Shows exactly why the strict equality condition fails
+-- ============================================================
+SELECT
+    CUST_E1_NUM,
+    MTH_CNT,
+    LOYAL_CNT,
+    ACTIVE_CNT,
+    NEW_CNT,
+    LOST_CNT,
+    AT_RISK_CNT,
+    RE_ACTIVATED_CNT,
+    -- The strict equality check that assigns LOYAL
+    LOYAL_CNT + NEW_CNT                                   AS LOYAL_PLUS_NEW,
+    -- Does it equal MTH_CNT? (This is why LOYAL is not assigned)
+    CASE WHEN LOYAL_CNT + NEW_CNT = MTH_CNT 
+         THEN 'YES → gets LOYAL' 
+         ELSE 'NO → falls to AT RISK' 
+    END                                                   AS LOYAL_CONDITION_MET,
+    -- What months are NOT being counted as LOYAL or NEW?
+    MTH_CNT - LOYAL_CNT - NEW_CNT                        AS UNACCOUNTED_MONTHS,
+    ACCT_STATUS,
+    LIFE_CYCLE
+FROM DEV_ENT_DL_US_MMS_MISC_DB.HADOOP.M_CHURN_ST_SUMMARY_CW
+WHERE LOYAL_CNT > 0
+  AND LIFE_CYCLE != 'LOYAL'   -- has loyal months but not getting LOYAL label
+ORDER BY LOYAL_CNT DESC
+LIMIT 50;
+-- KEY OUTPUT: UNACCOUNTED_MONTHS > 0 means those months
+-- are breaking the LOYAL_CNT + NEW_CNT = MTH_CNT equality
+
+
+-- ============================================================
+-- STEP 4: Find what those unaccounted months are
+-- Trace a specific customer from indicator table
+-- ============================================================
+SELECT
+    CI.CUST_E1_NUM,
+    CI.MONTH_RUN,
+    CI.CHURN_FLAG,
+    CI.LIFECYCLE_FLAG,
+    CI.CHURN_SALES,
+    CI.EVAL_SALES,
+    CI.LVL2_CTGRY_EVAL
+FROM DEV_ENT_DL_US_MMS_MISC_DB.HADOOP.M_CUST_CHURN_INDICATOR_ST_CW CI
+WHERE CI.CUST_E1_NUM IN (
+    -- Pick a customer that has LOYAL months but is NOT getting LOYAL in summary
+    SELECT CUST_E1_NUM
+    FROM DEV_ENT_DL_US_MMS_MISC_DB.HADOOP.M_CHURN_ST_SUMMARY_CW
+    WHERE LOYAL_CNT > 0
+      AND LIFE_CYCLE != 'LOYAL'
+      AND ACCT_STATUS = 'CUSTOMER'
+    LIMIT 5
+)
+AND CI.LGCY_PLTFRM = 'MMS'
+ORDER BY CI.CUST_E1_NUM, CI.MONTH_RUN;
+-- Shows month-by-month breakdown for these customers
+-- Look for months where LIFECYCLE_FLAG is not LOYAL or NEW
+-- Those are breaking the strict equality
+
+
+-- ============================================================
+-- STEP 5: Summary of why customers with LOYAL months
+-- are not getting LIFE_CYCLE = 'LOYAL'
+-- ============================================================
+SELECT
+    CASE
+        WHEN LOYAL_CNT + NEW_CNT = MTH_CNT
+            THEN 'Gets LOYAL correctly'
+        WHEN LOYAL_CNT + ACTIVE_CNT + NEW_CNT = MTH_CNT
+            THEN 'Gets LOYAL/ACTIVE (mixed months)'
+        WHEN ACTIVE_CNT + NEW_CNT = MTH_CNT
+            THEN 'Gets ACTIVE (no pure LOYAL months)'
+        WHEN AT_RISK_CNT > 0
+            THEN 'Has AT RISK months — breaks LOYAL equality'
+        WHEN RE_ACTIVATED_CNT > 0
+            THEN 'Has RE-ACTIVATED months — breaks LOYAL equality'
+        WHEN LOST_CNT > 0
+            THEN 'Has LOST months — breaks LOYAL equality'
+        ELSE 'Other — falls to AT RISK'
+    END                                                   AS REASON_NOT_LOYAL,
+    COUNT(DISTINCT CUST_E1_NUM)                           AS AFFECTED_CUSTOMERS,
+    SUM(LOYAL_CNT)                                        AS TOTAL_LOYAL_MONTHS_LOST
+FROM DEV_ENT_DL_US_MMS_MISC_DB.HADOOP.M_CHURN_ST_SUMMARY_CW
+WHERE LOYAL_CNT > 0
+  AND LIFE_CYCLE != 'LOYAL'
+  AND ACCT_STATUS = 'CUSTOMER'
+GROUP BY 1
+ORDER BY AFFECTED_CUSTOMERS DESC;
+-- This shows EXACTLY why each customer is being denied LOYAL
+-- even though they have LOYAL months in the indicator table
+
+
+-- ============================================================
+-- STEP 6: Check if M_CHURN_ST_SUMMARY_CW is stale
+-- It may not have been rebuilt after LOYAL fix was applied
+-- ============================================================
+SELECT
+    MAX(UPDATE_DT)                                        AS LAST_UPDATE,
+    COUNT(DISTINCT CUST_E1_NUM)                           AS TOTAL_CUSTOMERS,
+    COUNT(CASE WHEN LOYAL_CNT > 0 THEN 1 END)            AS CUSTOMERS_WITH_LOYAL_MONTHS,
+    COUNT(CASE WHEN LIFE_CYCLE = 'LOYAL' THEN 1 END)     AS CUSTOMERS_WITH_LOYAL_LIFECYCLE,
+    COUNT(CASE WHEN LIFE_CYCLE = 'LOYAL/ACTIVE' THEN 1 END) AS LOYAL_ACTIVE
+FROM DEV_ENT_DL_US_MMS_MISC_DB.HADOOP.M_CHURN_ST_SUMMARY_CW;
+-- KEY: If LAST_UPDATE is before your LOYAL fix date → table needs rebuilding
+-- If CUSTOMERS_WITH_LOYAL_MONTHS >> CUSTOMERS_WITH_LOYAL_LIFECYCLE
+-- → the strict equality condition is the problem
