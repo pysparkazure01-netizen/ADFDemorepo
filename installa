@@ -1,12 +1,8 @@
-import sys, subprocess, getpass, importlib.util
-print("Python :", sys.version.split()[0], "|", sys.executable)
-print("OS user:", getpass.getuser())
-for m in ["paramiko", "azure.storage.blob", "azure.identity"]:
-    try:
-        ok = importlib.util.find_spec(m) is not None
-    except ModuleNotFoundError:
-        ok = False
-    print(f"{m:20s}: {'INSTALLED' if ok else 'MISSING'}")
-r = subprocess.run([sys.executable, "-m", "pip", "--version"],
-                   capture_output=True, text=True)
-print("pip    :", (r.stdout or r.stderr).strip())
+import sys, subprocess
+r = subprocess.run(
+    [sys.executable, "-m", "pip", "install", "--user",
+     "paramiko", "azure-identity"],
+    capture_output=True, text=True)
+print(r.stdout[-3000:])
+print(r.stderr[-3000:])
+print("exit code:", r.returncode)
