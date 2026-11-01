@@ -1,8 +1,12 @@
 import sys, subprocess
-r = subprocess.run(
-    [sys.executable, "-m", "pip", "install", "--user",
-     "paramiko", "azure-identity"],
-    capture_output=True, text=True)
-print(r.stdout[-3000:])
-print(r.stderr[-3000:])
-print("exit code:", r.returncode)
+r = subprocess.run([sys.executable, "-m", "pip", "install", "--user", "isodate"],
+                   capture_output=True, text=True)
+print(r.stdout[-1500:], r.stderr[-1500:], "exit code:", r.returncode)
+
+# real import test (in a fresh Python, so it sees the new installs)
+test = ("import paramiko, azure.storage.blob, azure.identity;"
+        "print('paramiko', paramiko.__version__);"
+        "print('azure-storage-blob', azure.storage.blob.__version__);"
+        "print('ALL IMPORTS OK')")
+t = subprocess.run([sys.executable, "-c", test], capture_output=True, text=True)
+print(t.stdout, t.stderr)
