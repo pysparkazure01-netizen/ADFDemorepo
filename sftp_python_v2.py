@@ -63,6 +63,8 @@ CONFIG = {
     "workers":       8,      # parallel threads; keep BELOW the SFTP MaxSessions limit
     "max_files":     500,    # TEST run; set None for full load. e.g. 50000 to cap one run (history load); None = all
     "pattern":       r"(?i)^(?:.*\.xml|[^.]+)$",   # .xml or no extension
+    "print_blob_paths": 20,  # print source -> blob path for the first N loaded files (0 = off)
+    "min_age_seconds": 120,  # skip files changed in the last 2 min (sender still writing)
     "overwrite":     True,   # overwrite blob if it already exists
     "fail_on_error": True,   # raise at the end if any file failed
 }
@@ -124,25 +126,44 @@ class SftpPool:
 # Listing
 # --------------------------------------------------------------------------
 def list_files(sftp, remote_dir, pattern, max_files=None, recursive=False,
-               exclude_dirs=("archive",)):
+               exclude_dirs=("archive",), min_age_seconds=0):
     """Return [(full_path, size)] of regular files whose NAME matches pattern."""
     rx = re.compile(pattern)
     out = []
-    stack = [remote_dir]
+    cutoff = time.time() - (min_age_seconds or 0)
+    too_new = 0
+    stack = [(remote_dir, 0)]
+    seen = set()
     while stack:
-        d = stack.pop()
+        d, depth = stack.pop()
+        try:
+            real = sftp.normalize(d)
+        except IOError:
+            real = d
+        if real in seen:            # folder that links back to itself
+            continue
+        seen.add(real)
         for e in sftp.listdir_iter(d):
             full = posixpath.join(d, e.filename)
+            if stat.S_ISLNK(e.st_mode):
+                continue            # never follow symlinks (avoids loops)
             if stat.S_ISDIR(e.st_mode):
-                if recursive and e.filename.lower() not in exclude_dirs:
-                    stack.append(full)
+                if (recursive and depth < 5
+                        and e.filename.lower() not in exclude_dirs):
+                    stack.append((full, depth + 1))
                 continue
             if not stat.S_ISREG(e.st_mode):
                 continue
             if rx.match(e.filename):
+                if min_age_seconds and e.st_mtime and e.st_mtime > cutoff:
+                    too_new += 1      # probably still being written by the sender
+                    continue
                 out.append((full, e.st_size))
                 if max_files and len(out) >= max_files:
                     return out
+    if too_new:
+        print(f"  skipped {too_new} file(s) modified in the last "
+              f"{min_age_seconds}s (still arriving) - next run picks them up")
     return out
 
 
@@ -154,19 +175,23 @@ def copy_one(pool, container_client, remote_path, remote_root, blob_prefix,
     rel = posixpath.relpath(remote_path, remote_root)
     blob_name = posixpath.join(blob_prefix, rel) if blob_prefix else rel
     last_err = None
+    stage = "start"
     for attempt in range(1, retries + 1):
         try:
             sftp = pool.client()
+            stage = "download"
             buf = io.BytesIO()
             sftp.getfo(remote_path, buf)
             data = buf.getvalue()
 
+            stage = "upload"
             container_client.upload_blob(
                 name=blob_name, data=data, overwrite=overwrite,
                 content_settings=ContentSettings(content_type="application/xml"),
             )
 
             if archive_dir:
+                stage = "archive"
                 target = posixpath.join(archive_dir, posixpath.basename(remote_path))
                 try:
                     sftp.posix_rename(remote_path, target)  # overwrites if exists
@@ -175,11 +200,21 @@ def copy_one(pool, container_client, remote_path, remote_root, blob_prefix,
             return {"file": remote_path, "blob": blob_name, "bytes": len(data),
                     "status": "OK", "attempts": attempt, "error": ""}
         except Exception as e:  # retry on transient errors
-            last_err = e
+            last_err = f"{stage}: {e!r}"
             if "BlobAlreadyExists" in str(e):
                 return {"file": remote_path, "blob": blob_name, "bytes": 0,
                         "status": "SKIPPED_EXISTS", "attempts": attempt,
                         "error": ""}
+            if stage == "download":
+                # Was the file removed/renamed after we listed it?
+                try:
+                    pool.client().stat(remote_path)
+                except FileNotFoundError:
+                    return {"file": remote_path, "blob": blob_name, "bytes": 0,
+                            "status": "VANISHED", "attempts": attempt,
+                            "error": "file removed or renamed on SFTP after listing"}
+                except Exception:
+                    pass
             time.sleep(2 * attempt)
     return {"file": remote_path, "blob": blob_name, "bytes": 0,
             "status": "FAILED", "attempts": retries, "error": repr(last_err)}
@@ -216,13 +251,16 @@ def run(cfg):
 
     blob_svc = make_blob_service(cfg)
     container = blob_svc.get_container_client(cfg["container"])
+    _prefix = (cfg.get("blob_prefix") or "").strip("/")
+    print(f"Blob target folder: {container.url}/{_prefix}/")
 
     pool = SftpPool(cfg["host"], int(cfg["port"]), cfg["user"],
                     password=cfg.get("password"), key_file=cfg.get("key_file"))
     try:
         files = list_files(pool.client(), cfg["remote_dir"], cfg["pattern"],
                            max_files=cfg.get("max_files"),
-                           recursive=cfg.get("recursive", False))
+                           recursive=cfg.get("recursive", False),
+                           min_age_seconds=int(cfg.get("min_age_seconds") or 0))
         print(f"[{run_id}] {len(files)} files matched in {cfg['remote_dir']}"
               f" (workers={workers})")
 
@@ -247,6 +285,7 @@ def run(cfg):
 
     ok = sum(r["status"] == "OK" for r in results)
     skipped = sum(r["status"] == "SKIPPED_EXISTS" for r in results)
+    vanished = [r for r in results if r["status"] == "VANISHED"]
     failed = [r for r in results if r["status"] == "FAILED"]
     secs = time.time() - t0
 
@@ -260,12 +299,20 @@ def run(cfg):
         container.upload_blob(mname, out.getvalue().encode(), overwrite=True)
         print(f"Manifest: {cfg['container']}/{mname}")
 
-    print(f"Done in {secs:.1f}s  OK={ok}  SKIPPED={skipped}  FAILED={len(failed)}")
+    print(f"Done in {secs:.1f}s  OK={ok}  SKIPPED={skipped}  "
+          f"VANISHED={len(vanished)}  FAILED={len(failed)}")
+    for r in vanished[:20]:
+        print(f"  VANISHED {r['file']}: {r['error']}")
+    show = int(cfg.get("print_blob_paths") or 0)
+    if show:
+        print(f"Blob paths (first {show} loaded):")
+        for r in [x for x in results if x["status"] == "OK"][:show]:
+            print(f"  {r['file']}  ->  {container.url}/{r['blob']}")
     for r in failed[:20]:
         print(f"  FAILED {r['file']}: {r['error']}")
 
     summary = {"run_id": run_id, "matched": len(files), "ok": ok,
-               "skipped": skipped, "failed": len(failed), "seconds": round(secs, 1)}
+               "skipped": skipped, "vanished": len(vanished), "failed": len(failed), "seconds": round(secs, 1)}
     if failed and cfg.get("fail_on_error", True):
         raise RuntimeError(f"{len(failed)} file(s) failed - see log/manifest")
     return summary
