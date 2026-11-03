@@ -1,10 +1,8 @@
-from azure.identity import ManagedIdentityCredential
-from azure.storage.blob import BlobServiceClient
-svc = BlobServiceClient("https://sadsprodmigrationwest.blob.core.windows.net",
-                        credential=ManagedIdentityCredential())
-c = svc.get_container_client("dev-dl")
-try:
-    c.upload_blob("inbound/dscsa_ib_mba/_write_test.txt", b"test", overwrite=True)
-    print("WRITE OK")
-except Exception as e:
-    print("WRITE FAILED ->", str(e).splitlines()[0])
+LIST @DEV_ENT_DL_US_MMS_MISC_DB.DSCSA.DEV_ENT_DL_US_MMS_STG/dscsa_ib_mba;
+
+SELECT "name", "size", "last_modified"
+FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
+WHERE "name" ILIKE '%EPCIS%'
+   OR "name" ILIKE '%919110XML%'
+   OR "last_modified" ILIKE '%3 Nov 2026%'
+ORDER BY "name";
