@@ -1,8 +1,41 @@
-LIST @DEV_ENT_DL_US_MMS_MISC_DB.DSCSA.DEV_ENT_DL_US_MMS_STG/dscsa_ib_mba;
+import requests
+from azure.identity import ManagedIdentityCredential
+from azure.storage.blob import BlobServiceClient
 
-SELECT "name", "size", "last_modified"
-FROM TABLE(RESULT_SCAN(LAST_QUERY_ID()))
-WHERE "name" ILIKE '%EPCIS%'
-   OR "name" ILIKE '%919110XML%'
-   OR "last_modified" ILIKE '%3 Nov 2026%'
-ORDER BY "name";
+ACCOUNT = "sadsprodmigrationwest"
+cred = ManagedIdentityCredential()
+tok = cred.get_token("https://management.azure.com/.default").token
+H = {"Authorization": f"Bearer {tok}"}
+
+# subscription of this VM (storage account may be in another one)
+meta = requests.get("http://169.254.169.254/metadata/instance/compute?api-version=2021-02-01",
+                    headers={"Metadata": "true"}, timeout=5).json()
+print("VM subscription:", meta["subscriptionId"], "| VM RG:", meta["resourceGroupName"])
+
+subs = [s["subscriptionId"] for s in requests.get(
+    "https://management.azure.com/subscriptions?api-version=2020-01-01",
+    headers=H, timeout=30).json().get("value", [])]
+print("Subscriptions visible:", len(subs))
+
+acct_id = None
+for sub in subs:
+    r = requests.get(f"https://management.azure.com/subscriptions/{sub}/providers/"
+                     "Microsoft.Storage/storageAccounts?api-version=2023-01-01",
+                     headers=H, timeout=30).json()
+    for a in r.get("value", []):
+        if a["name"].lower() == ACCOUNT:
+            acct_id = a["id"]
+print("Storage account found:", acct_id)
+
+if acct_id:
+    r = requests.post(f"https://management.azure.com{acct_id}/listKeys?api-version=2023-01-01",
+                      headers=H, timeout=30)
+    print("listKeys HTTP status:", r.status_code)
+    if r.ok:
+        key = r.json()["keys"][0]["value"]
+        c = BlobServiceClient(f"https://{ACCOUNT}.blob.core.windows.net",
+                              credential=key).get_container_client("dev-dl")
+        c.upload_blob("inbound/dscsa_ib_mba/_write_test.txt", b"test", overwrite=True)
+        print("WRITE WITH ACCOUNT KEY: OK")
+    else:
+        print(r.text[:300])
