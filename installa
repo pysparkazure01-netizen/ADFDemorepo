@@ -1,12 +1,10 @@
-import sys, subprocess
-r = subprocess.run([sys.executable, "-m", "pip", "install", "--user", "isodate"],
-                   capture_output=True, text=True)
-print(r.stdout[-1500:], r.stderr[-1500:], "exit code:", r.returncode)
-
-# real import test (in a fresh Python, so it sees the new installs)
-test = ("import paramiko, azure.storage.blob, azure.identity;"
-        "print('paramiko', paramiko.__version__);"
-        "print('azure-storage-blob', azure.storage.blob.__version__);"
-        "print('ALL IMPORTS OK')")
-t = subprocess.run([sys.executable, "-c", test], capture_output=True, text=True)
-print(t.stdout, t.stderr)
+from azure.identity import ManagedIdentityCredential
+from azure.storage.blob import BlobServiceClient
+svc = BlobServiceClient("https://sadsprodmigrationwest.blob.core.windows.net",
+                        credential=ManagedIdentityCredential())
+c = svc.get_container_client("dev-dl")
+try:
+    c.upload_blob("inbound/dscsa_ib_mba/_write_test.txt", b"test", overwrite=True)
+    print("WRITE OK")
+except Exception as e:
+    print("WRITE FAILED ->", str(e).splitlines()[0])
