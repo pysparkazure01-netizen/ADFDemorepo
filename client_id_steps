@@ -1,0 +1,9 @@
+Azure Portal → Storage accounts → sadsprodmigrationwest.
+Left menu → Access control (IAM) → Role assignments tab.
+In the Type filter, choose Apps (sometimes shown as Service principal).
+Look at roles like Storage Blob Data Contributor, Contributor or Storage Account Contributor. Click each app name and check its Application (client) ID. Find the one ending in 2738.
+
+Once have the client ID, the sequence is:
+Get a new secret created. In Azure Portal, someone who owns the app (or an Entra ID admin) goes to Microsoft Entra ID → App registrations → All applications, searches the client ID, 
+opens the app → Certificates & secrets → Client secrets → + New client secret, gives it a description like matillion-python-sftp and an expiry (e.g. 12 months), and clicks Add.
+The secret value is shown only once, so it must be copied right away. The existing secret Matillion uses keeps working.
