@@ -1,6 +1,7 @@
 """
-blob_archive_prod.py
---------------------
+blob_archive_dev.py
+-------------------
+(DEV version with all values filled in - only the client secret is left)
 Move loaded files in Azure Blob from the main folder to its Archive sub-folder,
 e.g.  dev-dl/inbound/dscsa_mba/<file>  ->  dev-dl/inbound/dscsa_mba/Archive/<file>_<YYYYMMDDHHMMSS>
 
@@ -27,8 +28,8 @@ CONFIG = {
     "dry_run":         True,    # True = only list; set False to really move
 
     # ---- Blob ----
-    "storage_account": "<STORAGE_ACCOUNT>",      # DEV: sadsprodmigrationwest
-    "container":       "<CONTAINER>",            # DEV: dev-dl
+    "storage_account": "sadsprodmigrationwest",
+    "container":       "dev-dl",
     "source_prefix":   "inbound/dscsa_mba",      # main folder (no leading/trailing "/")
     "archive_folder":  "Archive",                # sub-folder under source_prefix
     "name_suffix":     "timestamp",              # "timestamp" -> <name>_YYYYMMDDHHMMSS
@@ -43,7 +44,9 @@ CONFIG = {
     # ---- Login (service principal, same app as Matillion's "blob" credential) ----
     "blob_auth":       "service_principal",      # or "connection_string"
     "tenant_id":       "da67ef1b-ca59-4db2-9a8c-aa8d94617a16",
-    "client_id":       "<CLIENT_ID>",            # DEV: 9681266b-e1a1-4256-b4f3-199b27f42738
+    "client_id":       "9681266b-e1a1-4256-b4f3-199b27f42738",
+    "client_secret":   "<AZURE_CLIENT_SECRET>",  # <-- type the secret here, OR leave as is
+                                                 #     and set one of the variables below
     "client_secret_var": ["jv_azure_client_secret", "ev_dscsa_azure_client_secret"],
     "blob_conn_str":   None,                     # only for "connection_string"
 }
@@ -108,10 +111,14 @@ def container_client(cfg, g):
     else:
         from azure.identity import ClientSecretCredential
         names = cfg["client_secret_var"]
-        secret = next((g.get(n) for n in names if not _is_placeholder(g.get(n))), None)
+        secret = cfg.get("client_secret")
         if _is_placeholder(secret):
-            raise ValueError("Azure client secret: none of the Matillion variables "
-                             + ", ".join(names) + " is set")
+            secret = next((g.get(n) for n in names if not _is_placeholder(g.get(n))), None)
+        else:
+            print("NOTE: client secret typed in the script - DEV testing only")
+        if _is_placeholder(secret):
+            raise ValueError("Azure client secret: type it in CONFIG client_secret, or set "
+                             "one of the Matillion variables " + ", ".join(names))
         cred = ClientSecretCredential(cfg["tenant_id"], cfg["client_id"], secret)
         svc = BlobServiceClient(f"https://{cfg['storage_account']}.blob.core.windows.net",
                                 credential=cred)
