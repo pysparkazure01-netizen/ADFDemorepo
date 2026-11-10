@@ -25,12 +25,12 @@ Timeout = 3600), AFTER the Snowflake Copy Command has succeeded.
 # variables in VARIABLE_OVERRIDES when they exist.
 # ==========================================================================
 CONFIG = {
-    "dry_run":         True,    # True = only list; set False to really move
+    "dry_run":         False,    # True = only list; set False to really move
 
     # ---- Blob ----
-    "storage_account": "sadsprodmigrationwest",
-    "container":       "dev-dl",
-    "source_prefix":   "inbound/dscsa_mba",      # main folder (no leading/trailing "/")
+    #"storage_account": "sadsprodmigrationwest",
+   # "container":       "dev-dl",
+   # "source_prefix":   "inbound/dscsa_mba",      # main folder (no leading/trailing "/")
     "archive_folder":  "Archive",                # sub-folder under source_prefix
     "name_suffix":     "timestamp",              # "timestamp" -> <name>_YYYYMMDDHHMMSS
                                                  # None        -> keep the same name
@@ -42,11 +42,17 @@ CONFIG = {
     "workers":         16,
 
     # ---- Login (service principal, same app as Matillion's "blob" credential) ----
-    "blob_auth":       "service_principal",      # or "connection_string"
-    "tenant_id":       "da67ef1b-ca59-4db2-9a8c-aa8d94617a16",
-    "client_id":       "9681266b-e1a1-4256-b4f3-199b27f42738",
-    "client_secret":   "<AZURE_CLIENT_SECRET>",  # <-- type the secret here, OR leave as is
-                                                 #     and set one of the variables below
+    "blob_auth":       "service_principal",      
+ # or "connection_string"
+ # "tenant_id":       "da67ef1b-ca59-4db2-9a8c-aa8d94617a16",
+ # "client_id":       "9681266b-e1a1-4256-b4f3-199b27f42738",
+  #"client_secret":   ,
+   
+   # "tenant_id":       "ev_dscs_tenant_id",
+   # "client_id":       "ev_dscsa_client_id",
+   # "client_secret":   "ev_dscsa_client_secret", 
+  # <-- type the secret here, OR leave as is
+  #     and set one of the variables below
     "client_secret_var": ["jv_azure_client_secret", "ev_dscsa_azure_client_secret"],
     "blob_conn_str":   None,                     # only for "connection_string"
 }
