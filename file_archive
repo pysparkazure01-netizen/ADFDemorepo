@@ -1,73 +1,71 @@
 """
-blob_archive_dev.py
--------------------
-(DEV version with all values filled in - only the client secret is left)
-Move loaded files in Azure Blob from the main folder to its Archive sub-folder,
-e.g.  dev-dl/inbound/dscsa_mba/<file>  ->  dev-dl/inbound/dscsa_mba/Archive/<file>_<YYYYMMDDHHMMSS>
+blob_archive_prod.py
+--------------------
+Move loaded files in Azure Blob from the main folder to its Archive sub-folder:
+    <container>/<folder>/<file>  ->  <container>/<folder>/Archive/<file>_<YYYYMMDDHHMMSS>
 
-Run it in a Matillion "Python Script" component (Interpreter = Python 3,
-Timeout = 3600), AFTER the Snowflake Copy Command has succeeded.
+Run in a Matillion "Python Script" component (Interpreter = Python 3,
+Timeout = 3600), connected to the SUCCESS output of the Snowflake Copy Command.
 
-  * Only files directly in the main folder are moved (sub-folders such as
-    Archive/ are never touched)
-  * Move = server-side copy inside the storage account, wait until the copy
-    has finished, check the size, then delete the original. Nothing is
-    deleted unless its archive copy is confirmed.
-  * Parallel (thread pool) - thousands of files in a few minutes
-  * Optional cutoff: only files that landed before a given UTC time are moved,
-    so a file that arrives while the COPY is running is not archived unloaded
-  * DRY_RUN = True lists what would move without changing anything
-  * Same login and Matillion variables as sftp_to_blob_prod.py; no secrets in code
+  * Only files directly in the main folder are moved; sub-folders such as
+    Archive/ are never touched
+  * Move = server-side copy inside the storage account -> wait for the copy ->
+    check the size -> delete the original. Nothing is deleted unless its
+    archive copy is confirmed.
+  * Parallel (thread pool)
+  * All settings and the secret come from Matillion variables; nothing
+    environment-specific is stored in this script
+
+MATILLION VARIABLES
+  Required (environment variables, one value per environment):
+    ev_dscsa_storage_account       storage account name
+    ev_dscsa_blob_container        container
+    ev_dscsa_tenant_id             Azure tenant ID
+    ev_dscsa_client_id             service principal client (application) ID
+    ev_dscsa_azure_client_secret   service principal secret
+  Required (job variable, or one of its fallbacks):
+    jv_archive_source_prefix       main Blob folder, e.g. inbound/dscsa_mba
+                                   (falls back to jv_blob_prefix, ev_dscsa_blob_prefix)
+  Optional (job variables):
+    jv_archive_dry_run             Yes = only list, move nothing (default No)
+    jv_archive_cutoff_utc          only move files last modified before this
+                                   UTC time, e.g. 2026-11-09T17:30:00
+    jv_archive_max_files           cap per run (0 = no cap)
+    jv_archive_workers             parallel threads (default 16)
+  Written back after the run (if they exist as job variables):
+    jv_archive_files_matched, jv_archive_files_moved, jv_archive_files_failed
 """
 
 # ==========================================================================
-# CONFIG - DEV values shown; per-environment values come from the Matillion
-# variables in VARIABLE_OVERRIDES when they exist.
+# Defaults (not environment-specific)
 # ==========================================================================
 CONFIG = {
-    "dry_run":         False,    # True = only list; set False to really move
-
-    # ---- Blob ----
-    #"storage_account": "sadsprodmigrationwest",
-   # "container":       "dev-dl",
-   # "source_prefix":   "inbound/dscsa_mba",      # main folder (no leading/trailing "/")
-    "archive_folder":  "Archive",                # sub-folder under source_prefix
-    "name_suffix":     "timestamp",              # "timestamp" -> <name>_YYYYMMDDHHMMSS
-                                                 # None        -> keep the same name
+    "dry_run":        False,
+    "archive_folder": "Archive",       # sub-folder under the main folder
+    "name_suffix":    "timestamp",     # "timestamp" -> <name>_YYYYMMDDHHMMSS ; None -> same name
     # files to move: .xml, no extension, Tracelink 919110XML... names
-    "pattern":         r"(?i)^(?:.*\.xml|[^.]+|\d+XML\d+\..+)$",
-    "cutoff_utc":      None,    # e.g. "2026-11-09T17:30:00" - only move files
-                                # last modified BEFORE this UTC time; None = all
-    "max_files":       None,    # cap per run; None = all
-    "workers":         16,
-
-    # ---- Login (service principal, same app as Matillion's "blob" credential) ----
-    "blob_auth":       "service_principal",      
- # or "connection_string"
- # "tenant_id":       "da67ef1b-ca59-4db2-9a8c-aa8d94617a16",
- # "client_id":       "9681266b-e1a1-4256-b4f3-199b27f42738",
-  #"client_secret":   ,
-   
-   # "tenant_id":       "ev_dscs_tenant_id",
-   # "client_id":       "ev_dscsa_client_id",
-   # "client_secret":   "ev_dscsa_client_secret", 
-  # <-- type the secret here, OR leave as is
-  #     and set one of the variables below
-    "client_secret_var": ["jv_azure_client_secret", "ev_dscsa_azure_client_secret"],
-    "blob_conn_str":   None,                     # only for "connection_string"
+    "pattern":        r"(?i)^(?:.*\.xml|[^.]+|\d+XML\d+\..+)$",
+    "cutoff_utc":     None,
+    "max_files":      None,
+    "workers":        16,
 }
 
+# CONFIG key -> Matillion variable names, first non-empty one wins
 VARIABLE_OVERRIDES = {
-    "dry_run":         ["jv_archive_dry_run"],
     "storage_account": ["ev_dscsa_storage_account"],
     "container":       ["ev_dscsa_blob_container"],
-    "client_id":       ["ev_dscsa_client_id"],
     "tenant_id":       ["ev_dscsa_tenant_id"],
+    "client_id":       ["ev_dscsa_client_id"],
+    "client_secret":   ["jv_azure_client_secret", "ev_dscsa_azure_client_secret"],
     "source_prefix":   ["jv_archive_source_prefix", "jv_blob_prefix", "ev_dscsa_blob_prefix"],
+    "dry_run":         ["jv_archive_dry_run"],
     "cutoff_utc":      ["jv_archive_cutoff_utc"],
     "max_files":       ["jv_archive_max_files"],
     "workers":         ["jv_archive_workers"],
 }
+REQUIRED = ["storage_account", "container", "tenant_id", "client_id",
+            "client_secret", "source_prefix"]
+SECRET_KEYS = {"client_secret"}        # never printed
 
 RESULT_VARIABLES = {
     "matched": "jv_archive_files_matched",
@@ -82,52 +80,46 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
+from azure.identity import ClientSecretCredential
 from azure.storage.blob import BlobServiceClient
 
 
-def _is_placeholder(v):
-    return v is None or (isinstance(v, str) and (v.strip() == "" or v.startswith("<")))
+def _is_empty(v):
+    return v is None or (isinstance(v, str) and v.strip() == "")
 
 
-def apply_overrides(cfg, g):
+def load_settings(cfg, g):
     used = []
     for key, names in VARIABLE_OVERRIDES.items():
         for var in names:
             val = g.get(var)
-            if _is_placeholder(val):
+            if _is_empty(val):
                 continue
-            val = str(val).strip()
-            if key in ("workers",):
+            val = str(val).strip().strip('"').strip("'")   # tolerate quotes typed in the grid
+            if key == "workers":
                 val = int(val)
             elif key == "max_files":
                 val = int(val) or None
             elif key == "dry_run":
                 val = val.lower() in ("true", "yes", "y", "1")
-            elif val.lower() == "none":
+            elif key != "client_secret" and val.lower() == "none":
                 val = None
             cfg[key] = val
             used.append(f"{key}<-{var}")
             break
     print("Values from Matillion variables:", ", ".join(used) if used else "none")
+    missing = [k for k in REQUIRED if _is_empty(cfg.get(k))]
+    if missing:
+        raise ValueError("Missing Matillion variables: " + "; ".join(
+            f"{k} (set {' or '.join(VARIABLE_OVERRIDES[k])})" for k in missing))
+    print("Settings:", {k: v for k, v in cfg.items()
+                        if k not in SECRET_KEYS and k != "pattern"})
 
 
-def container_client(cfg, g):
-    if cfg["blob_auth"] == "connection_string":
-        svc = BlobServiceClient.from_connection_string(cfg["blob_conn_str"])
-    else:
-        from azure.identity import ClientSecretCredential
-        names = cfg["client_secret_var"]
-        secret = cfg.get("client_secret")
-        if _is_placeholder(secret):
-            secret = next((g.get(n) for n in names if not _is_placeholder(g.get(n))), None)
-        else:
-            print("NOTE: client secret typed in the script - DEV testing only")
-        if _is_placeholder(secret):
-            raise ValueError("Azure client secret: type it in CONFIG client_secret, or set "
-                             "one of the Matillion variables " + ", ".join(names))
-        cred = ClientSecretCredential(cfg["tenant_id"], cfg["client_id"], secret)
-        svc = BlobServiceClient(f"https://{cfg['storage_account']}.blob.core.windows.net",
-                                credential=cred)
+def container_client(cfg):
+    cred = ClientSecretCredential(cfg["tenant_id"], cfg["client_id"], cfg["client_secret"])
+    svc = BlobServiceClient(f"https://{cfg['storage_account']}.blob.core.windows.net",
+                            credential=cred)
     return svc.get_container_client(cfg["container"])
 
 
@@ -139,10 +131,10 @@ def list_candidates(container, cfg):
         cutoff = datetime.fromisoformat(str(cfg["cutoff_utc"]).replace("Z", "")) \
             .replace(tzinfo=timezone.utc)
     out, skipped_new = [], 0
-    # walk_blobs with delimiter -> only files directly in the folder, not Archive/...
+    # delimiter "/" -> only files directly in the folder, not Archive/...
     for item in container.walk_blobs(name_starts_with=prefix, delimiter="/"):
         name = item.name
-        if name.endswith("/"):            # a sub-folder (e.g. Archive/) - skip
+        if name.endswith("/"):                 # a sub-folder (e.g. Archive/)
             continue
         base = name[len(prefix):]
         if not base or not rx.match(base) or base.startswith("_write_probe_"):
@@ -179,11 +171,11 @@ def move_one(container, name, size, cfg, stamp, retries=3):
                 raise RuntimeError(f"copy status {status}")
             if props.size != size:
                 raise RuntimeError(f"size mismatch {props.size} != {size}")
-            src.delete_blob()
+            src.delete_blob()                          # only after a confirmed copy
             return {"file": name, "target": target, "status": "MOVED", "error": ""}
         except Exception as e:
             last = e
-            if "BlobNotFound" in str(e):              # already moved by someone else
+            if "BlobNotFound" in str(e):               # already moved by someone else
                 return {"file": name, "target": target, "status": "GONE",
                         "error": "source no longer exists"}
             time.sleep(2 * attempt)
@@ -191,17 +183,17 @@ def move_one(container, name, size, cfg, stamp, retries=3):
             "error": str(last).splitlines()[0]}
 
 
-def run(cfg, g):
+def run(cfg):
     t0 = time.time()
     stamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    container = container_client(cfg, g)
+    container = container_client(cfg)
     files = list_candidates(container, cfg)
     print(f"{len(files)} file(s) to archive in {cfg['container']}/{cfg['source_prefix']}/ "
           f"-> {cfg['archive_folder']}/   (dry_run={cfg['dry_run']})")
     for name, _ in files[:5]:
         print("   ", name)
     if cfg["dry_run"]:
-        print("DRY RUN - nothing moved. Set dry_run False (or jv_archive_dry_run = No) to move.")
+        print("DRY RUN - nothing moved (jv_archive_dry_run = Yes).")
         return {"matched": len(files), "moved": 0, "failed": 0}
 
     results = []
@@ -231,17 +223,11 @@ def publish(summary, g):
         try:
             ctx.updateVariable(var, str(summary[k]))
         except Exception:
-            pass
+            pass                               # variable not defined in this job
 
 
 _g = globals()
-apply_overrides(CONFIG, _g)
-_missing = [k for k in ("storage_account", "container", "source_prefix")
-            if _is_placeholder(CONFIG.get(k))]
-if CONFIG["blob_auth"] == "service_principal":
-    _missing += [k for k in ("tenant_id", "client_id") if _is_placeholder(CONFIG.get(k))]
-if _missing:
-    raise ValueError("Fill in CONFIG / Matillion variables first: " + ", ".join(_missing))
-_summary = run(CONFIG, _g)
+load_settings(CONFIG, _g)
+_summary = run(CONFIG)
 print(_summary)
 publish(_summary, _g)
