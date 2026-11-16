@@ -1,0 +1,5 @@
+SELECT SOURCE_FILE_PATH
+FROM ${ev_DI_Audit_Database}.${ev_DI_Audit_Schema}.${ev_DI_Audit_Ingestion_Table}
+WHERE BATCH_NAME = '${jv_batch_name}'
+  AND JOB_ACTIVE_FLAG = 'Y'
+LIMIT 1
