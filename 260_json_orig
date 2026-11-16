@@ -7,6 +7,8 @@ Copy files from an SFTP folder to Azure Blob in parallel:
 Run in a Matillion "Python Script" component (Interpreter = Python 3,
 Timeout = 3600). The same script serves inbound and outbound: the SFTP folder
 and Blob folder come from the framework's config row for the running batch.
+Test it by running the schedule - running the component alone uses the job's
+default values, not the batch's.
 
   * ONE SFTP login, N worker threads (one SFTP channel each)
   * Picks every file in the folder (sub-folders are skipped);
@@ -19,26 +21,24 @@ and Blob folder come from the framework's config row for the running batch.
   * All settings and secrets come from Matillion variables; nothing
     environment-specific is stored in this script
 
-MATILLION VARIABLES
-  Per run, from the framework (filled from EDL_INGEST_JOB_T for this batch,
-  so inbound and outbound each get their own values automatically):
-    jv_file_source_connection_string   sftp://user@host:port/<SFTP folder>
-    jv_file_source_username            SFTP user
-    ev_blob_root_folder + jv_file_path Blob folder (same as the old Data Transfer)
-  Required (environment variables, one value per environment):
-    ev_dscsa_sftp_password         SFTP password
-    ev_dscsa_storage_account       storage account name
-    ev_dscsa_blob_container        container
-    ev_dscsa_tenant_id             Azure tenant ID
-    ev_dscsa_client_id             service principal client (application) ID
-    ev_dscsa_azure_client_secret   service principal secret
-  Fallbacks, only used if the framework values are not there:
-    ev_dscsa_sftp_host, ev_dscsa_sftp_port (default 5022), ev_dscsa_sftp_user,
-    jv_sftp_source_dir, jv_blob_prefix
-  Optional (job variables):
-    jv_sftp_archive_dir            SFTP archive folder; empty = leave files on SFTP
-    jv_sftp_workers                parallel threads (default 8)
-    jv_max_files                   cap per run (0 = no cap)
+MATILLION VARIABLES (one variable per setting, no fallbacks)
+  Framework, set per run from the config tables for this batch:
+    jv_file_source_connection_string  sftp://user@host:port/<SFTP folder>  (host, port, folder)
+    jv_file_source_username           SFTP user
+    jv_file_path                      Blob sub-folder, e.g. /dscsa_ib_mba
+  Framework environment variables:
+    ev_blob_account                   storage account, e.g. sadsprodmigrationwest/
+    ev_blob_container                 container, e.g. dev-dl/
+    ev_blob_root_folder               Blob root folder, e.g. inbound
+  Added for this script (environment variables):
+    ev_dscsa_sftp_password            SFTP password
+    ev_dscsa_tenant_id                Azure tenant ID
+    ev_dscsa_client_id                service principal client (application) ID
+    ev_dscsa_azure_client_secret      service principal secret
+  Optional job variables:
+    jv_sftp_archive_dir               SFTP archive folder; empty = leave files on SFTP
+    jv_sftp_workers                   parallel threads (default 8)
+    jv_max_files                      cap per run (0 = no cap)
   Written back after the run (if they exist as job variables):
     jv_sftp_files_matched, jv_sftp_files_loaded, jv_sftp_files_failed, jv_sftp_run_id
 """
@@ -60,31 +60,25 @@ CONFIG = {
     "overwrite":        True,
 }
 
-# CONFIG key -> Matillion variable names, first non-empty one wins
-VARIABLE_OVERRIDES = {
-    "host":            ["ev_dscsa_sftp_host"],
-    "port":            ["ev_dscsa_sftp_port"],
-    "user":            ["ev_dscsa_sftp_user"],
-    "password":        ["jv_sftp_password", "ev_dscsa_sftp_password"],
-    "remote_dir":      ["jv_sftp_source_dir"],
-    "archive_dir":     ["jv_sftp_archive_dir"],
-    "storage_account": ["ev_dscsa_storage_account"],
-    "container":       ["ev_dscsa_blob_container"],
-    "tenant_id":       ["ev_dscsa_tenant_id"],
-    "client_id":       ["ev_dscsa_client_id"],
-    "client_secret":   ["jv_azure_client_secret", "ev_dscsa_azure_client_secret"],
-    "blob_prefix":     ["jv_blob_prefix"],
-    "workers":         ["jv_sftp_workers"],
-    "max_files":       ["jv_max_files"],
+# Setting -> the ONE Matillion variable it comes from
+REQUIRED_VARIABLES = {
+    "connection_string": "jv_file_source_connection_string",
+    "user":              "jv_file_source_username",
+    "file_path":         "jv_file_path",
+    "storage_account":   "ev_blob_account",
+    "container":         "ev_blob_container",
+    "blob_root":         "ev_blob_root_folder",
+    "password":          "ev_dscsa_sftp_password",
+    "tenant_id":         "ev_dscsa_tenant_id",
+    "client_id":         "ev_dscsa_client_id",
+    "client_secret":     "ev_dscsa_azure_client_secret",
 }
-REQUIRED = ["host", "user", "password", "remote_dir", "storage_account",
-            "container", "tenant_id", "client_id", "client_secret", "blob_prefix"]
+OPTIONAL_VARIABLES = {
+    "archive_dir": "jv_sftp_archive_dir",
+    "workers":     "jv_sftp_workers",
+    "max_files":   "jv_max_files",
+}
 SECRET_KEYS = {"password", "client_secret"}      # never printed
-
-# True = take the SFTP folder/host/user and the Blob folder from the framework's
-# per-batch variables (filled from EDL_INGEST_JOB_T for inbound or outbound).
-# They win over the fallback variables above.
-USE_FRAMEWORK_CONFIG = True
 
 RESULT_VARIABLES = {
     "matched": "jv_sftp_files_matched",
@@ -161,75 +155,54 @@ def _is_empty(v):
     return v is None or (isinstance(v, str) and v.strip() == "")
 
 
-def _framework_blob_prefix(g):
-    """Blob folder exactly as the framework's old Data Transfer built it:
-    azure://${ev_blob_account}${ev_blob_container}${ev_blob_root_folder}${jv_file_path}"""
-    root, path = g.get("ev_blob_root_folder"), g.get("jv_file_path")
-    if _is_empty(path):
-        return None
-    parts = [str(p).strip().strip('"').strip("/") for p in (root, path) if not _is_empty(p)]
-    return "/".join(p for p in parts if p) or None
-
-
-def framework_values(g):
-    """Per-run values the framework loads from the config table
-    (EDL_INGEST_JOB_T) for this batch - inbound or outbound."""
-    out = {}
-    cs = g.get("jv_file_source_connection_string")
-    if not _is_empty(cs):
-        m = re.match(r'^s?ftp://(?:(?P<user>[^@]+)@)?(?P<host>[^:/]+)(?::(?P<port>\d+))?(?P<path>/.*)?$',
-                     str(cs).strip())
-        if m:
-            out["host"] = (m.group("host"), "jv_file_source_connection_string")
-            if m.group("port"):
-                out["port"] = (int(m.group("port")), "jv_file_source_connection_string")
-            path = (m.group("path") or "/").rstrip("/") or "/"
-            out["remote_dir"] = (path, "jv_file_source_connection_string")
-            if m.group("user"):
-                out["user"] = (m.group("user").strip('"').strip("'"),
-                               "jv_file_source_connection_string")
-    if not _is_empty(g.get("jv_file_source_username")):
-        out["user"] = (str(g["jv_file_source_username"]).strip().strip('"').strip("'"),
-                       "jv_file_source_username")
-    bp = _framework_blob_prefix(g)
-    if bp:
-        out["blob_prefix"] = (bp, "ev_blob_root_folder + jv_file_path")
-    return out
+def _clean(key, val):
+    val = str(val).strip()
+    if key not in SECRET_KEYS:
+        val = val.strip('"').strip("'")          # tolerate quotes typed in the grid
+    return val
 
 
 def load_settings(cfg, g):
-    used = []
-    for key, names in VARIABLE_OVERRIDES.items():
-        for var in names:
-            val = g.get(var)
-            if _is_empty(val):
-                continue
-            val = str(val).strip()
-            if key not in SECRET_KEYS:
-                val = val.strip('"').strip("'")     # tolerate quotes typed in the grid
-            if key in ("port", "workers"):
+    missing = [f"{key} ({var})" for key, var in REQUIRED_VARIABLES.items()
+               if _is_empty(g.get(var))]
+    if missing:
+        raise ValueError("Missing Matillion variables: " + ", ".join(missing))
+    v = {key: _clean(key, g[var]) for key, var in REQUIRED_VARIABLES.items()}
+    for key, var in OPTIONAL_VARIABLES.items():
+        if not _is_empty(g.get(var)):
+            val = _clean(key, g[var])
+            if key == "workers":
                 val = int(val)
             elif key == "max_files":
                 val = int(val) or None
-            elif key not in SECRET_KEYS and val.lower() == "none":
+            elif val.lower() == "none":
                 val = None
             cfg[key] = val
-            used.append(f"{key}<-{var}")
-            break
-    print("Values from Matillion variables:", ", ".join(used) if used else "none")
-    fw = framework_values(g) if USE_FRAMEWORK_CONFIG else {}
-    for key, (val, src) in fw.items():
-        cfg[key] = val
-    if fw:
-        print("Values from the framework config (this batch):",
-              ", ".join(f"{k}<-{s}" for k, (_, s) in fw.items()))
-    missing = [k for k in REQUIRED if _is_empty(cfg.get(k))]
-    if missing:
-        raise ValueError("Missing Matillion variables: " + "; ".join(
-            f"{k} (set {' or '.join(VARIABLE_OVERRIDES[k])})" for k in missing))
+
+    # SFTP host, port and folder from the connection string
+    m = re.match(r'^s?ftp://(?:(?P<user>[^@]+)@)?(?P<host>[^:/]+)(?::(?P<port>\d+))?(?P<path>/.*)?$',
+                 v["connection_string"])
+    if not m:
+        raise ValueError("jv_file_source_connection_string is not an sftp:// address: "
+                         + v["connection_string"])
+    cfg["host"] = m.group("host")
+    if m.group("port"):
+        cfg["port"] = int(m.group("port"))
+    cfg["remote_dir"] = (m.group("path") or "/").rstrip("/") or "/"
+    cfg["user"] = v["user"]
+    cfg["password"] = v["password"]
+
+    # Blob: same location the old Data Transfer used
+    cfg["storage_account"] = v["storage_account"].replace("azure://", "").strip("/")
+    cfg["container"] = v["container"].strip("/")
+    cfg["blob_prefix"] = "/".join(p.strip("/") for p in (v["blob_root"], v["file_path"])
+                                  if p.strip("/"))
+    cfg["tenant_id"], cfg["client_id"] = v["tenant_id"], v["client_id"]
+    cfg["client_secret"] = v["client_secret"]
+
     if int(cfg["workers"]) < 1:
         raise ValueError("workers must be >= 1")
-    print("Settings:", {k: v for k, v in cfg.items()
+    print("Settings:", {k: val for k, val in cfg.items()
                         if k not in SECRET_KEYS and k != "pattern"})
     if not cfg.get("archive_dir"):
         print("NOTE: no SFTP archive folder - source files stay on SFTP "
