@@ -1,7 +1,498 @@
--- what the COPY reads TODAY
-LIST @DEV_ENT_DL_US_MMS_MISC_DB.DSCSA.DEV_ENT_DL_US_MMS_STG/dscsa_ib_mba
-PATTERN = '^(?!.*archive/).*\.xml$';
+"""
+sftp_to_blob_prod.py
+--------------------
+Copy files from an SFTP folder to Azure Blob in parallel:
+    sftp://<host>:<port><source dir>/<file>  ->  <container>/<blob folder>/<file>
 
--- everything in the folder except Archive
-LIST @DEV_ENT_DL_US_MMS_MISC_DB.DSCSA.DEV_ENT_DL_US_MMS_STG/dscsa_ib_mba
-PATTERN = '^(?!.*[Aa]rchive/).*';
+Run in a Matillion "Python Script" component (Interpreter = Python 3,
+Timeout = 3600). The same script serves inbound and outbound: the SFTP folder
+and Blob folder come from the framework's config row for the running batch.
+
+  * ONE SFTP login, N worker threads (one SFTP channel each)
+  * Picks every file in the folder (sub-folders are skipped);
+    skips files changed in the last 2 minutes (sender still writing)
+  * Checks it can WRITE to Blob before reading any SFTP file
+  * Each file: download -> upload -> (optional) move the source file to an
+    SFTP archive folder, only after a successful upload
+  * Retries each file 3x; the component fails (red) if any file failed
+  * Installs missing Python libraries on first run (pip install --user)
+  * All settings and secrets come from Matillion variables; nothing
+    environment-specific is stored in this script
+
+MATILLION VARIABLES
+  Per run, from the framework (filled from EDL_INGEST_JOB_T for this batch,
+  so inbound and outbound each get their own values automatically):
+    jv_file_source_connection_string   sftp://user@host:port/<SFTP folder>
+    jv_file_source_username            SFTP user
+    ev_blob_root_folder + jv_file_path Blob folder (same as the old Data Transfer)
+  Required (environment variables, one value per environment):
+    ev_dscsa_sftp_password         SFTP password
+    ev_dscsa_storage_account       storage account name
+    ev_dscsa_blob_container        container
+    ev_dscsa_tenant_id             Azure tenant ID
+    ev_dscsa_client_id             service principal client (application) ID
+    ev_dscsa_azure_client_secret   service principal secret
+  Fallbacks, only used if the framework values are not there:
+    ev_dscsa_sftp_host, ev_dscsa_sftp_port (default 5022), ev_dscsa_sftp_user,
+    jv_sftp_source_dir, jv_blob_prefix
+  Optional (job variables):
+    jv_sftp_archive_dir            SFTP archive folder; empty = leave files on SFTP
+    jv_sftp_workers                parallel threads (default 8)
+    jv_max_files                   cap per run (0 = no cap)
+  Written back after the run (if they exist as job variables):
+    jv_sftp_files_matched, jv_sftp_files_loaded, jv_sftp_files_failed, jv_sftp_run_id
+"""
+
+# ==========================================================================
+# Defaults (not environment-specific)
+# ==========================================================================
+CONFIG = {
+    "port":             5022,
+    "archive_dir":      None,
+    "recursive":        False,
+    "workers":          8,
+    "max_files":        None,
+    # every file in the folder (sub-folders such as Archive/ are never included);
+    # must match the COPY pattern in EDL_INGEST_JOB_T.SOURCE_FILE_COLUMN_LIST
+    "pattern":          r".*",
+    "min_age_seconds":  120,
+    "print_blob_paths": 10,
+    "overwrite":        True,
+}
+
+# CONFIG key -> Matillion variable names, first non-empty one wins
+VARIABLE_OVERRIDES = {
+    "host":            ["ev_dscsa_sftp_host"],
+    "port":            ["ev_dscsa_sftp_port"],
+    "user":            ["ev_dscsa_sftp_user"],
+    "password":        ["jv_sftp_password", "ev_dscsa_sftp_password"],
+    "remote_dir":      ["jv_sftp_source_dir"],
+    "archive_dir":     ["jv_sftp_archive_dir"],
+    "storage_account": ["ev_dscsa_storage_account"],
+    "container":       ["ev_dscsa_blob_container"],
+    "tenant_id":       ["ev_dscsa_tenant_id"],
+    "client_id":       ["ev_dscsa_client_id"],
+    "client_secret":   ["jv_azure_client_secret", "ev_dscsa_azure_client_secret"],
+    "blob_prefix":     ["jv_blob_prefix"],
+    "workers":         ["jv_sftp_workers"],
+    "max_files":       ["jv_max_files"],
+}
+REQUIRED = ["host", "user", "password", "remote_dir", "storage_account",
+            "container", "tenant_id", "client_id", "client_secret", "blob_prefix"]
+SECRET_KEYS = {"password", "client_secret"}      # never printed
+
+# True = take the SFTP folder/host/user and the Blob folder from the framework's
+# per-batch variables (filled from EDL_INGEST_JOB_T for inbound or outbound).
+# They win over the fallback variables above.
+USE_FRAMEWORK_CONFIG = True
+
+RESULT_VARIABLES = {
+    "matched": "jv_sftp_files_matched",
+    "ok":      "jv_sftp_files_loaded",
+    "failed":  "jv_sftp_files_failed",
+    "run_id":  "jv_sftp_run_id",
+}
+
+# Python libraries: installed with "pip install --user" if missing
+LIBRARIES = {
+    "paramiko":           "paramiko==5.1.0",
+    "isodate":            "isodate==0.7.2",
+    "azure.identity":     "azure-identity==1.27.0",
+    "azure.storage.blob": "azure-storage-blob==12.31.1",
+}
+PIP_EXTRA_ARGS = []     # e.g. ["--proxy", "http://proxy:8080"]
+# ==========================================================================
+
+import io
+import posixpath
+import re
+import stat
+import sys
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
+
+
+def _ensure_libraries():
+    import importlib, site, subprocess
+
+    def missing():
+        out = []
+        for mod in LIBRARIES:
+            try:
+                __import__(mod)
+            except Exception:
+                out.append(mod)
+        return out
+
+    miss = missing()
+    if not miss:
+        return
+    reqs = [LIBRARIES[m] for m in miss]
+    print("Installing missing Python libraries:", " ".join(reqs))
+    r = subprocess.run([sys.executable, "-m", "pip", "install", "--user",
+                        "--disable-pip-version-check"] + reqs + PIP_EXTRA_ARGS,
+                       capture_output=True, text=True)
+    for line in (r.stdout + r.stderr).splitlines():
+        if "Successfully" in line or "ERROR" in line:
+            print("  ", line[:200])
+    if r.returncode != 0:
+        raise ImportError(f"pip install failed (exit {r.returncode})")
+    if site.getusersitepackages() not in sys.path:
+        sys.path.append(site.getusersitepackages())
+    importlib.invalidate_caches()
+    still = missing()
+    if still:
+        raise ImportError("Still missing after install: " + ", ".join(still))
+
+
+_ensure_libraries()
+
+import paramiko
+from azure.identity import ClientSecretCredential
+from azure.storage.blob import BlobServiceClient, ContentSettings
+
+
+# --------------------------------------------------------------------------
+# Settings from Matillion variables
+# --------------------------------------------------------------------------
+def _is_empty(v):
+    return v is None or (isinstance(v, str) and v.strip() == "")
+
+
+def _framework_blob_prefix(g):
+    """Blob folder exactly as the framework's old Data Transfer built it:
+    azure://${ev_blob_account}${ev_blob_container}${ev_blob_root_folder}${jv_file_path}"""
+    root, path = g.get("ev_blob_root_folder"), g.get("jv_file_path")
+    if _is_empty(path):
+        return None
+    parts = [str(p).strip().strip('"').strip("/") for p in (root, path) if not _is_empty(p)]
+    return "/".join(p for p in parts if p) or None
+
+
+def framework_values(g):
+    """Per-run values the framework loads from the config table
+    (EDL_INGEST_JOB_T) for this batch - inbound or outbound."""
+    out = {}
+    cs = g.get("jv_file_source_connection_string")
+    if not _is_empty(cs):
+        m = re.match(r'^s?ftp://(?:(?P<user>[^@]+)@)?(?P<host>[^:/]+)(?::(?P<port>\d+))?(?P<path>/.*)?$',
+                     str(cs).strip())
+        if m:
+            out["host"] = (m.group("host"), "jv_file_source_connection_string")
+            if m.group("port"):
+                out["port"] = (int(m.group("port")), "jv_file_source_connection_string")
+            path = (m.group("path") or "/").rstrip("/") or "/"
+            out["remote_dir"] = (path, "jv_file_source_connection_string")
+            if m.group("user"):
+                out["user"] = (m.group("user").strip('"').strip("'"),
+                               "jv_file_source_connection_string")
+    if not _is_empty(g.get("jv_file_source_username")):
+        out["user"] = (str(g["jv_file_source_username"]).strip().strip('"').strip("'"),
+                       "jv_file_source_username")
+    bp = _framework_blob_prefix(g)
+    if bp:
+        out["blob_prefix"] = (bp, "ev_blob_root_folder + jv_file_path")
+    return out
+
+
+def load_settings(cfg, g):
+    used = []
+    for key, names in VARIABLE_OVERRIDES.items():
+        for var in names:
+            val = g.get(var)
+            if _is_empty(val):
+                continue
+            val = str(val).strip()
+            if key not in SECRET_KEYS:
+                val = val.strip('"').strip("'")     # tolerate quotes typed in the grid
+            if key in ("port", "workers"):
+                val = int(val)
+            elif key == "max_files":
+                val = int(val) or None
+            elif key not in SECRET_KEYS and val.lower() == "none":
+                val = None
+            cfg[key] = val
+            used.append(f"{key}<-{var}")
+            break
+    print("Values from Matillion variables:", ", ".join(used) if used else "none")
+    fw = framework_values(g) if USE_FRAMEWORK_CONFIG else {}
+    for key, (val, src) in fw.items():
+        cfg[key] = val
+    if fw:
+        print("Values from the framework config (this batch):",
+              ", ".join(f"{k}<-{s}" for k, (_, s) in fw.items()))
+    missing = [k for k in REQUIRED if _is_empty(cfg.get(k))]
+    if missing:
+        raise ValueError("Missing Matillion variables: " + "; ".join(
+            f"{k} (set {' or '.join(VARIABLE_OVERRIDES[k])})" for k in missing))
+    if int(cfg["workers"]) < 1:
+        raise ValueError("workers must be >= 1")
+    print("Settings:", {k: v for k, v in cfg.items()
+                        if k not in SECRET_KEYS and k != "pattern"})
+    if not cfg.get("archive_dir"):
+        print("NOTE: no SFTP archive folder - source files stay on SFTP "
+              "and are copied again next run")
+
+
+# --------------------------------------------------------------------------
+# SFTP connection: one login, one SFTP channel per thread
+# --------------------------------------------------------------------------
+class SftpPool:
+    def __init__(self, host, port, username, password, timeout=30):
+        self.transport = paramiko.Transport((host, port))
+        self.transport.banner_timeout = timeout
+        self.transport.set_keepalive(30)
+        self.transport.connect(username=username, password=password)
+        self._local = threading.local()
+        self._clients = []
+        self._lock = threading.Lock()
+
+    def client(self):
+        c = getattr(self._local, "sftp", None)
+        if c is None:
+            c = paramiko.SFTPClient.from_transport(self.transport)
+            self._local.sftp = c
+            with self._lock:
+                self._clients.append(c)
+        return c
+
+    def close(self):
+        for c in self._clients:
+            try:
+                c.close()
+            except Exception:
+                pass
+        self.transport.close()
+
+
+def list_files(sftp, remote_dir, pattern, max_files=None, recursive=False,
+               exclude_dirs=("archive",), min_age_seconds=0):
+    """Return [(full_path, size)] of regular files whose NAME matches pattern."""
+    rx = re.compile(pattern)
+    out = []
+    cutoff = time.time() - (min_age_seconds or 0)
+    too_new = 0
+    stack = [(remote_dir, 0)]
+    seen = set()
+    while stack:
+        d, depth = stack.pop()
+        try:
+            real = sftp.normalize(d)
+        except IOError:
+            real = d
+        if real in seen:                 # folder that links back to itself
+            continue
+        seen.add(real)
+        for e in sftp.listdir_iter(d):
+            full = posixpath.join(d, e.filename)
+            if stat.S_ISLNK(e.st_mode):
+                continue                 # never follow links (avoids loops)
+            if stat.S_ISDIR(e.st_mode):
+                if recursive and depth < 5 and e.filename.lower() not in exclude_dirs:
+                    stack.append((full, depth + 1))
+                continue
+            if not stat.S_ISREG(e.st_mode):
+                continue
+            if rx.match(e.filename):
+                if min_age_seconds and e.st_mtime and e.st_mtime > cutoff:
+                    too_new += 1         # probably still being written
+                    continue
+                out.append((full, e.st_size))
+                if max_files and len(out) >= max_files:
+                    return out
+    if too_new:
+        print(f"  skipped {too_new} file(s) modified in the last {min_age_seconds}s "
+              "(still arriving) - next run picks them up")
+    return out
+
+
+# --------------------------------------------------------------------------
+# Per-file work (runs in a worker thread)
+# --------------------------------------------------------------------------
+def copy_one(pool, container, remote_path, remote_root, blob_prefix,
+             archive_dir, overwrite, retries=3):
+    rel = posixpath.relpath(remote_path, remote_root)
+    blob_name = posixpath.join(blob_prefix, rel) if blob_prefix else rel
+    last_err = None
+    stage = "start"
+    for attempt in range(1, retries + 1):
+        try:
+            sftp = pool.client()
+            stage = "download"
+            buf = io.BytesIO()
+            sftp.getfo(remote_path, buf)
+            data = buf.getvalue()
+
+            stage = "upload"
+            container.upload_blob(
+                name=blob_name, data=data, overwrite=overwrite,
+                content_settings=ContentSettings(content_type="application/xml"))
+
+            if archive_dir:                      # only after a successful upload
+                stage = "archive"
+                target = posixpath.join(archive_dir, posixpath.basename(remote_path))
+                try:
+                    sftp.posix_rename(remote_path, target)
+                except (IOError, paramiko.SSHException):
+                    sftp.rename(remote_path, target)
+            return {"file": remote_path, "blob": blob_name, "status": "OK", "error": ""}
+        except Exception as e:
+            last_err = f"{stage}: {e!r}"
+            if "BlobAlreadyExists" in str(e):
+                return {"file": remote_path, "blob": blob_name,
+                        "status": "SKIPPED_EXISTS", "error": ""}
+            if stage == "download":              # removed/renamed after listing?
+                try:
+                    pool.client().stat(remote_path)
+                except FileNotFoundError:
+                    return {"file": remote_path, "blob": blob_name, "status": "VANISHED",
+                            "error": "file removed or renamed on SFTP after listing"}
+                except Exception:
+                    pass
+            time.sleep(2 * attempt)
+    return {"file": remote_path, "blob": blob_name, "status": "FAILED", "error": last_err}
+
+
+# --------------------------------------------------------------------------
+# Blob login + write check
+# --------------------------------------------------------------------------
+def _credential(cfg):
+    return ClientSecretCredential(cfg["tenant_id"], cfg["client_id"], cfg["client_secret"])
+
+
+def _account_key_via_arm(cfg):
+    """Fetch the storage account key through Azure Resource Manager with the same
+    service principal (used only if it has no Blob data role)."""
+    import requests
+    tok = _credential(cfg).get_token("https://management.azure.com/.default").token
+    h = {"Authorization": f"Bearer {tok}"}
+    arm = "https://management.azure.com"
+    subs = [s["subscriptionId"] for s in requests.get(
+        f"{arm}/subscriptions?api-version=2020-01-01", headers=h,
+        timeout=60).json().get("value", [])]
+    for sub in subs:
+        r = requests.get(f"{arm}/subscriptions/{sub}/providers/Microsoft.Storage/"
+                         "storageAccounts?api-version=2023-01-01", headers=h,
+                         timeout=60).json()
+        for a in r.get("value", []):
+            if a["name"].lower() == cfg["storage_account"].lower():
+                k = requests.post(f"{arm}{a['id']}/listKeys?api-version=2023-01-01",
+                                  headers=h, timeout=60)
+                if k.ok:
+                    return k.json()["keys"][0]["value"]
+                raise PermissionError(f"listKeys refused (HTTP {k.status_code})")
+    raise PermissionError(f"storage account {cfg['storage_account']} not visible "
+                          f"to this identity ({len(subs)} subscription(s) checked)")
+
+
+def get_container(cfg, run_id):
+    """Log in to Blob and prove we can WRITE before touching any SFTP file."""
+    url = f"https://{cfg['storage_account']}.blob.core.windows.net"
+    container = BlobServiceClient(url, credential=_credential(cfg)) \
+        .get_container_client(cfg["container"])
+    probe = posixpath.join(cfg["blob_prefix"].strip("/"), f"_write_probe_{run_id}.tmp")
+
+    def try_write(c):
+        c.upload_blob(probe, b"probe", overwrite=True)
+        try:
+            c.delete_blob(probe)
+        except Exception:
+            print(f"  note: could not delete probe blob {probe}; delete it manually")
+
+    try:
+        try_write(container)
+        print("Blob write check: OK (service principal, direct)")
+        return container
+    except Exception as e:
+        msg = str(e).splitlines()[0]
+        if "AuthorizationPermissionMismatch" not in str(e):
+            raise RuntimeError(f"Blob write check failed: {msg}") from None
+        print(f"Blob write check: direct write refused ({msg})")
+        print("  trying the storage account key via Azure Resource Manager...")
+    container = BlobServiceClient(url, credential=_account_key_via_arm(cfg)) \
+        .get_container_client(cfg["container"])
+    try_write(container)
+    print("Blob write check: OK (service principal, via account key)")
+    return container
+
+
+# --------------------------------------------------------------------------
+# Main
+# --------------------------------------------------------------------------
+def run(cfg):
+    t0 = time.time()
+    run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    workers = int(cfg["workers"])
+    blob_prefix = cfg["blob_prefix"].strip("/")
+
+    container = get_container(cfg, run_id)       # fails before any SFTP file is read
+    print(f"Blob target folder: {container.url}/{blob_prefix}/")
+
+    pool = SftpPool(cfg["host"], int(cfg["port"]), cfg["user"], cfg["password"])
+    try:
+        files = list_files(pool.client(), cfg["remote_dir"], cfg["pattern"],
+                           max_files=cfg.get("max_files"),
+                           recursive=cfg.get("recursive", False),
+                           min_age_seconds=int(cfg.get("min_age_seconds") or 0))
+        print(f"[{run_id}] {len(files)} files matched in {cfg['remote_dir']} "
+              f"(workers={workers})")
+        if cfg.get("archive_dir"):
+            try:
+                pool.client().mkdir(cfg["archive_dir"])
+            except IOError:
+                pass                             # already exists
+
+        results = []
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futs = [ex.submit(copy_one, pool, container, path, cfg["remote_dir"],
+                              blob_prefix, cfg.get("archive_dir"), cfg["overwrite"])
+                    for path, _ in files]
+            for i, f in enumerate(as_completed(futs), 1):
+                results.append(f.result())
+                if i % 500 == 0 or i == len(futs):
+                    print(f"  progress {i}/{len(futs)}")
+    finally:
+        pool.close()
+
+    ok = sum(r["status"] == "OK" for r in results)
+    skipped = sum(r["status"] == "SKIPPED_EXISTS" for r in results)
+    vanished = [r for r in results if r["status"] == "VANISHED"]
+    failed = [r for r in results if r["status"] == "FAILED"]
+    secs = time.time() - t0
+
+    print(f"Done in {secs:.1f}s  OK={ok}  SKIPPED={skipped}  "
+          f"VANISHED={len(vanished)}  FAILED={len(failed)}")
+    for r in vanished[:20]:
+        print(f"  VANISHED {r['file']}: {r['error']}")
+    show = int(cfg.get("print_blob_paths") or 0)
+    if show:
+        for r in [x for x in results if x["status"] == "OK"][:show]:
+            print(f"  {r['file']}  ->  {container.url}/{r['blob']}")
+    for r in failed[:20]:
+        print(f"  FAILED {r['file']}: {r['error']}")
+
+    summary = {"run_id": run_id, "matched": len(files), "ok": ok, "skipped": skipped,
+               "vanished": len(vanished), "failed": len(failed), "seconds": round(secs, 1)}
+    if failed:
+        raise RuntimeError(f"{len(failed)} file(s) failed - see messages above")
+    return summary
+
+
+def publish(summary, g):
+    ctx = g.get("context")
+    if ctx is None:
+        return
+    for k, var in RESULT_VARIABLES.items():
+        try:
+            ctx.updateVariable(var, str(summary[k]))
+        except Exception:
+            pass                                 # variable not defined in this job
+
+
+_g = globals()
+load_settings(CONFIG, _g)
+_summary = run(CONFIG)
+print(_summary)
+publish(_summary, _g)
